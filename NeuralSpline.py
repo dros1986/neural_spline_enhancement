@@ -10,6 +10,7 @@ import torch.utils.data as data
 from multiprocessing import cpu_count
 import numpy as np
 from tqdm import tqdm
+from sklearn.preprocessing import OneHotEncoder
 
 
 
@@ -82,15 +83,16 @@ class NeuralSpline(nn.Module):
 		ex = torch.stack([xf ** 3, xf ** 2, xf, ones], dim=0)
 		#y = np.dot(coeffs.transpose(0,1), ex)
 		y = torch.mm(coeffs.transpose(0,1), ex)
-		xi = xi.long()
-		r = Variable(torch.arange(0,xi.size(0)),requires_grad=False).long()
-
-		res = Variable(torch.zeros(xi.size()))
-		for i in range(res.size(0)):
-			cur_res = y.index_select(0,xi[i].long())
-			cur_res = cur_res.squeeze().index_select(0,Variable(torch.LongTensor([i]).cuda(),requires_grad=False))
-			res[i] = cur_res
-		#res = y[xi,r]
+		#xi = xi.long()
+		# create constant mat
+		ohe = OneHotEncoder(n_values=y.size(0), categorical_features='all', dtype=np.float64, sparse=False, handle_unknown='error')
+		sel_mat = ohe.fit_transform(xi.data.cpu().numpy().reshape(-1,1))
+		sel_mat = Variable(torch.from_numpy(sel_mat), requires_grad=False)
+		sel_mat = sel_mat.transpose(0,1).float().cuda()
+		# multiply to get the right coeffs
+		res = y*sel_mat
+		res = res.sum(0)
+		# return
 		return res
 
 
@@ -105,7 +107,7 @@ class NeuralSpline(nn.Module):
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
 		# now we got xs and ys. We need to create the interpolating spline
-		out = Variable(torch.zeros(batch.size()))
+		out = Variable(torch.zeros(batch.size())).cuda()
 		# for each image
 		for nimg in range(batch.size(0)):
 			# interpolate spline with found ys
@@ -129,7 +131,8 @@ if __name__ == "__main__":
 	spline.cuda()
 	# img = torch.rand(1,3,256,256)
 	# px_vals = unique(img)
-	img = Variable(torch.rand(1,3,256,256)).cuda()
+	img = Variable(torch.rand(5,3,256,256)).cuda()
 	out = spline(img)
 	print(out.size())
+	import ipdb; ipdb.set_trace()
 	#ris = spline(img)
