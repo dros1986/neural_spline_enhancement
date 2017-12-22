@@ -1,4 +1,4 @@
-import os,sys,math,time
+import os,sys,math,time,io
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,7 +10,9 @@ from Dataset import Dataset
 from NeuralSpline import NeuralSpline
 from tensorboard import SummaryWriter
 from multiprocessing import cpu_count
+import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
 class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
@@ -22,6 +24,35 @@ def showImage(writer, batch, name):
 	img = img.cpu().numpy().transpose((1, 2, 0))
 	img = (img*255).astype(np.uint8)
 	writer.add_image(name, img)
+
+def plotSplines(writer, splines, name):
+	# get range
+	my_dpi = 100
+	r = torch.arange(0,1,1.0/splines.size(1)).numpy()
+	splines_images = torch.Tensor([])
+	# plot each spline
+	for i in range(splines.size(0)):
+		plt.figure(figsize=(400/my_dpi, 400/my_dpi), dpi=my_dpi)
+		cur_spline = splines[i,:]
+		# plot spline
+		plt.plot(r,cur_spline.numpy(),linewidth=4)
+		plt.xlim(0,1)
+		plt.ylim(0,1)
+		plt.grid()
+		# save plot to PIL image
+		buf = io.BytesIO()
+		plt.savefig(buf, format='png', bbox_inches='tight', dpi=my_dpi)
+		plt.close()
+		buf.seek(0)
+		im = Image.open(buf)
+		tim = transforms.ToTensor()(im).unsqueeze(0)
+		tim = tim[:,:3,:,:]
+		if splines_images.ndimension() == 0:
+			splines_images = tim
+		else:
+			splines_images = torch.cat((splines_images,tim),0)
+	# plot
+	showImage(writer, splines_images, name)
 
 
 
@@ -60,7 +91,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, weig
 				# convert to cuda Variable
 				raw, expert = Variable(raw.cuda()), Variable(expert.cuda(), requires_grad=False)
 				# apply spline transform
-				out = spline(raw)
+				out, splines = spline(raw)
 				# calculate loss
 				loss = F.l1_loss(out,expert)
 				# plot loss
@@ -68,10 +99,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, weig
 				# backprop
 				loss.backward()
 				# update optimizer
-				if bn % 10 == 0:
+				if bn % (10 if nepoch < 3 else 100) == 0:
 					showImage(writer, raw.data, 'train_input')
 					showImage(writer, out.data, 'train_output')
 					showImage(writer, expert.data, 'train_gt')
+					plotSplines(writer, splines, 'splines')
 				if bn % 100 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),

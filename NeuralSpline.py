@@ -79,7 +79,7 @@ class NeuralSpline(nn.Module):
 		xi = torch.clamp((x - self.x0) / self.step, 0, self.n-2)
 		xi = torch.floor(xi)
 		xf = x - self.x0 - xi*self.step
-		ones = Variable(torch.zeros(xf.size()),requires_grad=False).cuda()
+		ones = Variable(torch.ones(xf.size()),requires_grad=False).cuda()
 		ex = torch.stack([xf ** 3, xf ** 2, xf, ones], dim=0)
 		#y = np.dot(coeffs.transpose(0,1), ex)
 		y = torch.mm(coeffs.transpose(0,1), ex)
@@ -108,6 +108,8 @@ class NeuralSpline(nn.Module):
 		ys = self.l2(ys)
 		# now we got xs and ys. We need to create the interpolating spline
 		out = Variable(torch.zeros(batch.size())).cuda()
+		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
+		splines = torch.zeros(batch.size(0),vals.size(0))
 		# for each image
 		for nimg in range(batch.size(0)):
 			# interpolate spline with found ys
@@ -115,9 +117,10 @@ class NeuralSpline(nn.Module):
 			cur_ys = ys[nimg,:]
 			cur_coeffs = self.interpolate(cur_ys)
 			new_img = self.apply(cur_coeffs, cur_img.view(-1))
+			splines[nimg,:] = self.apply(cur_coeffs,vals).data.cpu()
 			out[nimg] = new_img
 		# return
-		return out
+		return out, splines
 
 
 def unique(tensor1d):
@@ -132,7 +135,7 @@ if __name__ == "__main__":
 	# img = torch.rand(1,3,256,256)
 	# px_vals = unique(img)
 	img = Variable(torch.rand(5,3,256,256)).cuda()
-	out = spline(img)
+	out, splines = spline(img)
 	print(out.size())
 	import ipdb; ipdb.set_trace()
 	#ris = spline(img)
