@@ -26,17 +26,17 @@ class NeuralSpline(nn.Module):
 		# define net layers
 		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
 		self.b1 = nn.BatchNorm2d(nc)
-		self.c2 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
-		self.b2 = nn.BatchNorm2d(nc)
-		self.c3 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
-		self.b3 = nn.BatchNorm2d(nc)
-		self.c4 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
-		self.b4 = nn.BatchNorm2d(nc)
-		self.c5 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
-		self.b5 = nn.BatchNorm2d(nc)
+		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+		self.b2 = nn.BatchNorm2d(2*nc)
+		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+		self.b3 = nn.BatchNorm2d(4*nc)
+		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+		self.b4 = nn.BatchNorm2d(8*nc)
+		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+		self.b5 = nn.BatchNorm2d(16*nc)
 
-		self.l1 = nn.Linear(nc*7*7, 2*n)
-		self.l2 = nn.Linear(2*n, n)
+		self.l1 = nn.Linear(16*nc*7*7, 100*n)
+		self.l2 = nn.Linear(100*n, 3*n)
 
 
 	def _precalc(self):
@@ -106,19 +106,25 @@ class NeuralSpline(nn.Module):
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
+		ys = ys.view(ys.size(0),3,-1)
 		# now we got xs and ys. We need to create the interpolating spline
 		out = Variable(torch.zeros(batch.size())).cuda()
 		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
-		splines = torch.zeros(batch.size(0),vals.size(0))
+		splines = torch.zeros(batch.size(0),3,vals.size(0))
 		# for each image
 		for nimg in range(batch.size(0)):
-			# interpolate spline with found ys
-			cur_img = batch[nimg,:,:,:]
-			cur_ys = ys[nimg,:]
-			cur_coeffs = self.interpolate(cur_ys)
-			new_img = self.apply(cur_coeffs, cur_img.view(-1))
-			splines[nimg,:] = self.apply(cur_coeffs,vals).data.cpu()
-			out[nimg] = new_img
+			# get image and corresponding ys
+			# cur_img = batch[nimg,:,:,:]
+			# for each channel
+			for ch in range(3):
+				# get current channel
+				cur_ch = batch[nimg,ch,:,:]
+				cur_ys = ys[nimg,ch,:]
+				# interpolate spline with found ys
+				cur_coeffs = self.interpolate(cur_ys)
+				new_ch = self.apply(cur_coeffs, cur_ch.view(-1))
+				splines[nimg,ch,:] = self.apply(cur_coeffs,vals).data.cpu()
+				out[nimg,ch,:,:] = new_ch
 		# return
 		return out, splines
 

@@ -21,6 +21,7 @@ class cols:
 def showImage(writer, batch, name):
 	# convert image to numpy
 	img = utils.make_grid(batch, nrow=int(math.sqrt(batch.size(0))), padding=3)
+	img = torch.clamp(img,0,1)
 	img = img.cpu().numpy().transpose((1, 2, 0))
 	img = (img*255).astype(np.uint8)
 	writer.add_image(name, img)
@@ -28,14 +29,17 @@ def showImage(writer, batch, name):
 def plotSplines(writer, splines, name):
 	# get range
 	my_dpi = 100
-	r = torch.arange(0,1,1.0/splines.size(1)).numpy()
+	r = torch.arange(0,1,1.0/splines.size(2)).numpy()
 	splines_images = torch.Tensor([])
 	# plot each spline
 	for i in range(splines.size(0)):
 		plt.figure(figsize=(400/my_dpi, 400/my_dpi), dpi=my_dpi)
-		cur_spline = splines[i,:]
-		# plot spline
-		plt.plot(r,cur_spline.numpy(),linewidth=4)
+		cur_spline = splines[i,:,:]
+		# plot splines
+		plt.plot(r,cur_spline[0,:].numpy(),color="r", linewidth=4)
+		plt.plot(r,cur_spline[1,:].numpy(),color="g", linewidth=4)
+		plt.plot(r,cur_spline[2,:].numpy(),color="b", linewidth=4)
+		# set range and show grid
 		plt.xlim(0,1)
 		plt.ylim(0,1)
 		plt.grid()
@@ -56,7 +60,7 @@ def plotSplines(writer, splines, name):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, weights_from=''):
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, weights_from=''):
 		# define summary writer
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), 'experiment'))
 		# create dataloader
@@ -64,15 +68,14 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, weig
 				Dataset(dRaw, dExpert, train_list, include_filenames=False),
 				batch_size = batch_size,
 				shuffle = True,
-				#num_workers = cpu_count(),
-				num_workers = 0,
+				num_workers = cpu_count(),
+				# num_workers = 0,
 				drop_last = False
 		)
 		# create neural spline
-		nf = 100
-		spline = NeuralSpline(npoints,nf).cuda()
+		spline = NeuralSpline(npoints,nc).cuda()
 		# define optimizer
-		optimizer = torch.optim.Adam(spline.parameters(), lr=0.001)
+		optimizer = torch.optim.Adam(spline.parameters(), lr=0.0001)
 		# ToDo: load weigths
 		start_epoch = 0
 		if weights_from:
@@ -93,7 +96,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, weig
 				# apply spline transform
 				out, splines = spline(raw)
 				# calculate loss
-				loss = F.l1_loss(out,expert)
+				loss = F.mse_loss(out,expert)
 				# plot loss
 				writer.add_scalar('train_loss', loss.data.cpu().mean(), curr_iter)
 				# backprop
