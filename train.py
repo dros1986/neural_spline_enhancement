@@ -96,7 +96,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# apply spline transform
 				out, splines = spline(raw)
 				# calculate loss
-				loss = F.mse_loss(out,expert)
+				# loss = F.mse_loss(out,expert)
+				# out = torch.clamp(out,0,1)
+				out = F.sigmoid(out)
+				out_lab, gt_lab = spline.rgb2lab(out), spline.rgb2lab(expert)
+				loss = F.mse_loss(out_lab, gt_lab)
 				# plot loss
 				writer.add_scalar('train_loss', loss.data.cpu().mean(), curr_iter)
 				# backprop

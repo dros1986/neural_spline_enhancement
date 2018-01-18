@@ -38,6 +38,48 @@ class NeuralSpline(nn.Module):
 		self.l1 = nn.Linear(16*nc*7*7, 100*n)
 		self.l2 = nn.Linear(100*n, 3*n)
 
+	def rgb2lab(self,x):
+		M,N = x.size(2),x.size(3)
+		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
+		R,G,B = R.view(x.size(0),1,-1),G.view(x.size(0),1,-1),B.view(x.size(0),1,-1)
+		RGB = torch.cat((R,G,B),1)
+		# RGB ProPhoto -> CIELAB XYZ
+		MAT = [[0.7976749, 0.1351917, 0.0313534], \
+		       [0.2880402, 0.7118741, 0.0000857], \
+		       [0.0000000, 0.0000000, 0.8252100]]
+		MAT = torch.Tensor(MAT)
+		MAT = MAT.unsqueeze(0).repeat(RGB.size(0),1,1)
+		if isinstance(RGB,Variable): MAT = Variable(MAT,requires_grad=False)
+		if RGB.is_cuda: MAT = MAT.cuda()
+		XYZ = torch.bmm(MAT,RGB)
+		# Normalize for D65 white point
+		X = XYZ[:,0,:]/0.950456
+		Y = XYZ[:,1,:]
+		Z = XYZ[:,2,:]/1.088754
+		T = 0.008856
+		XT,YT,ZT = X>T, Y>T, Z>T
+		XT,YT,ZT = XT.float(), YT.float(), ZT.float()
+		Y3 = Y.abs()**(1.0/3)
+		fX = XT * X.abs()**(1.0/3) + (1-XT) * (7.787*X + 16.0/116)
+		fY = YT * Y3 + (1-YT) * (7.787 * Y + 16.0/116)
+		fZ = ZT * Z.abs()**(1.0/3) + (1-ZT) * (7.787*Z + 16.0/116)
+		# debug
+		# if np.isnan(np.sum(fZ.data.cpu().numpy())):
+		# 	print('ERRORE')
+		# get LAB channels
+		L = YT * (116.0 * Y3 - 16.0) + (1-YT) * (903.3 * Y)
+		a = 500 * (fX - fY)
+		b = 200 * (fY - fZ)
+		L,a,b = L.view(-1,1,M,N), a.view(-1,1,M,N), b.view(-1,1,M,N)
+		# return
+		LAB = torch.cat((L,a,b),1)
+		return LAB
+		# PROVA
+		# X,Y,Z = X.contiguous(),Y.contiguous(),Z.contiguous()
+		# X,Y,Z = X.view(-1,1,M,N), Y.view(-1,1,M,N), Z.view(-1,1,M,N)
+		# XYZ = torch.cat((X,Y,Z),1)
+		# return XYZ
+
 
 	def _precalc(self):
 		""" Calculate interpolation mat for finding Ms.
