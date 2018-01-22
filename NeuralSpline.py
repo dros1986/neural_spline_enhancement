@@ -59,10 +59,11 @@ class NeuralSpline(nn.Module):
 		T = 0.008856
 		XT,YT,ZT = X>T, Y>T, Z>T
 		XT,YT,ZT = XT.float(), YT.float(), ZT.float()
-		Y3 = Y.abs()**(1.0/3)
-		fX = XT * X.abs()**(1.0/3) + (1-XT) * (7.787*X + 16.0/116)
+		mn = Variable(torch.Tensor([T]).cuda(), requires_grad=False)
+		Y3 = torch.max(Y,mn)**(1.0/3)
+		fX = XT * torch.max(X,mn)**(1.0/3) + (1-XT) * (7.787*X + 16.0/116)
 		fY = YT * Y3 + (1-YT) * (7.787 * Y + 16.0/116)
-		fZ = ZT * Z.abs()**(1.0/3) + (1-ZT) * (7.787*Z + 16.0/116)
+		fZ = ZT * torch.max(Z,mn)**(1.0/3) + (1-ZT) * (7.787*Z + 16.0/116)
 		# debug
 		# if np.isnan(np.sum(fZ.data.cpu().numpy())):
 		# 	print('ERRORE')
@@ -125,12 +126,11 @@ class NeuralSpline(nn.Module):
 		ex = torch.stack([xf ** 3, xf ** 2, xf, ones], dim=0)
 		#y = np.dot(coeffs.transpose(0,1), ex)
 		y = torch.mm(coeffs.transpose(0,1), ex)
-		#xi = xi.long()
 		# create constant mat
-		ohe = OneHotEncoder(n_values=y.size(0), categorical_features='all', dtype=np.float64, sparse=False, handle_unknown='error')
-		sel_mat = ohe.fit_transform(xi.data.cpu().numpy().reshape(-1,1))
-		sel_mat = Variable(torch.from_numpy(sel_mat), requires_grad=False)
-		sel_mat = sel_mat.transpose(0,1).float().cuda()
+		sel_mat = torch.zeros(y.size(0),xi.size(0)).cuda()
+		rng = torch.arange(0,xi.size(0)).cuda()
+		sel_mat[xi.data.long(),rng.long()]=1
+		sel_mat = Variable(sel_mat, requires_grad=False)
 		# multiply to get the right coeffs
 		res = y*sel_mat
 		res = res.sum(0)
@@ -149,6 +149,7 @@ class NeuralSpline(nn.Module):
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
 		ys = ys.view(ys.size(0),3,-1)
+		ys /= 100
 		# now we got xs and ys. We need to create the interpolating spline
 		out = Variable(torch.zeros(batch.size())).cuda()
 		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
@@ -163,7 +164,9 @@ class NeuralSpline(nn.Module):
 				cur_ch = batch[nimg,ch,:,:]
 				cur_ys = ys[nimg,ch,:]
 				# interpolate spline with found ys
-				cur_coeffs = self.interpolate(cur_ys)
+				identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
+				identity = Variable(identity,requires_grad=False).cuda()
+				cur_coeffs = self.interpolate(cur_ys+identity)
 				new_ch = self.apply(cur_coeffs, cur_ch.view(-1))
 				splines[nimg,ch,:] = self.apply(cur_coeffs,vals).data.cpu()
 				out[nimg,ch,:,:] = new_ch
