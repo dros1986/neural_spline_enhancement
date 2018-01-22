@@ -75,7 +75,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# create neural spline
 		spline = NeuralSpline(npoints,nc).cuda()
 		# define optimizer
-		optimizer = torch.optim.Adam(spline.parameters(), lr=0.0001)
+		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001)
 		# ToDo: load weigths
 		start_epoch = 0
 		if weights_from:
@@ -98,7 +98,6 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# calculate loss
 				# loss = F.mse_loss(out,expert)
 				# out = torch.clamp(out,0,1)
-				out = F.sigmoid(out)
 				out_lab, gt_lab = spline.rgb2lab(out), spline.rgb2lab(expert)
 				loss = F.mse_loss(out_lab, gt_lab)
 				# plot loss
@@ -106,7 +105,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# backprop
 				loss.backward()
 				# update optimizer
-				if bn % (10 if nepoch < 3 else 100) == 0:
+				if bn % (100 if curr_iter < 200 else 200) == 0:
 					showImage(writer, raw.data, 'train_input')
 					showImage(writer, out.data, 'train_output')
 					showImage(writer, expert.data, 'train_gt')
