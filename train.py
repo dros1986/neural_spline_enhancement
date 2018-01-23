@@ -63,7 +63,8 @@ def plotSplines(writer, splines, name):
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, weights_from=''):
 		# define summary writer
-		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), 'experiment'))
+		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
+		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
 		# create dataloader
 		train_data_loader = data.DataLoader(
 				Dataset(dRaw, dExpert, train_list, include_filenames=False),
@@ -116,7 +117,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						'state_dict': spline.state_dict(),
 						'optimizer': optimizer.state_dict(),
 						'nepoch' : nepoch,
-					}, './checkpoint.pth')
+					}, './{}.pth'.format(expname))
 				# update weights
 				optimizer.step()
 				# get time
@@ -144,7 +145,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-				}, './checkpoint_best_{:.4f}.pth'.format(l2_lab))
+				}, './{}_best_{:.4f}.pth'.format(expname,l2_lab))
 			# print
-			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab, cols.LIGHT_GRAY, l2_l, cols.ENDC))
+			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab, cols.LIGHT_GRAY, cols.GREEN, l2_l, cols.ENDC))
 			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))
