@@ -59,7 +59,9 @@ class NeuralSpline(nn.Module):
 		T = 0.008856
 		XT,YT,ZT = X>T, Y>T, Z>T
 		XT,YT,ZT = XT.float(), YT.float(), ZT.float()
-		mn = Variable(torch.Tensor([T]).cuda(), requires_grad=False)
+		mn = torch.Tensor([T]).cuda()
+		if isinstance(Y,Variable):
+			mn = Variable(mn, requires_grad=False)
 		Y3 = torch.max(Y,mn)**(1.0/3)
 		fX = XT * torch.max(X,mn)**(1.0/3) + (1-XT) * (7.787*X + 16.0/116)
 		fY = YT * Y3 + (1-YT) * (7.787 * Y + 16.0/116)

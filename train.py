@@ -13,6 +13,7 @@ from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+from test import test
 
 class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
@@ -84,7 +85,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			optimizer.load_state_dict(state['optimizer'])
 			start_epoch = state['nepoch']
 		# for each batch
-		curr_iter = 0
+		curr_iter,best_l2_lab = 0,0
 		for nepoch in range(start_epoch, epochs):
 			for bn, (raw,expert) in enumerate(train_data_loader):
 				#print(bn)
@@ -128,7 +129,22 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					 cols.BLUE + '[{:06d}]' + \
 					 cols.CYAN  + ' tm: ' + cols.BLUE + '{:.4f}' + \
 					 cols.LIGHT_GRAY + ' Loss: ' + cols.GREEN + '{:.4f}' + cols.ENDC \
-					).format(nepoch,bn,curr_iter,train_data_loader.__len__(), elapsed_time, loss.data[0])
+					).format(nepoch,bn,train_data_loader.__len__(),curr_iter, elapsed_time, loss.data[0])
 				print(s)
 				# update iter num
 				curr_iter = curr_iter + 1
+			# at the end of each epoch, test values
+			l2_lab, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
+			writer.add_scalar('L2-LAB', l2_lab, curr_iter)
+			writer.add_scalar('L2-L', l2_l, curr_iter)
+			# save best model
+			if nepoch == 0 or (nepoch>0 and l2_lab>best_l2_lab):
+				best_l2_lab = l2_lab
+				torch.save({
+					'state_dict': spline.state_dict(),
+					'optimizer': optimizer.state_dict(),
+					'nepoch' : nepoch,
+				}, './checkpoint_best_{:.4f}.pth'.format(l2_lab))
+			# print
+			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab, cols.LIGHT_GRAY, l2_l, cols.ENDC))
+			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))
