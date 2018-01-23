@@ -138,7 +138,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			writer.add_scalar('L2-LAB', l2_lab, curr_iter)
 			writer.add_scalar('L2-L', l2_l, curr_iter)
 			# save best model
-			if nepoch == 0 or (nepoch>0 and l2_lab>best_l2_lab):
+			if nepoch == 0 or (nepoch>0 and l2_lab<best_l2_lab):
 				best_l2_lab = l2_lab
 				torch.save({
 					'state_dict': spline.state_dict(),
