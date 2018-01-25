@@ -8,7 +8,7 @@ import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
 from NeuralSpline import NeuralSpline
-from tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,15 +19,13 @@ class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
 	LIGHT_GRAY = '\033[37m'; ENDC = '\033[0m'
 
-def showImage(writer, batch, name):
-	# convert image to numpy
+def showImage(writer, batch, name, n_iter):
+	# batch2image
 	img = utils.make_grid(batch, nrow=int(math.sqrt(batch.size(0))), padding=3)
 	img = torch.clamp(img,0,1)
-	img = img.cpu().numpy().transpose((1, 2, 0))
-	img = (img*255).astype(np.uint8)
-	writer.add_image(name, img)
+	writer.add_image(name, img, n_iter)
 
-def plotSplines(writer, splines, name):
+def plotSplines(writer, splines, name, n_iter):
 	# get range
 	my_dpi = 100
 	r = torch.arange(0,1,1.0/splines.size(2)).numpy()
@@ -57,7 +55,7 @@ def plotSplines(writer, splines, name):
 		else:
 			splines_images = torch.cat((splines_images,tim),0)
 	# plot
-	showImage(writer, splines_images, name)
+	showImage(writer, splines_images, name, n_iter)
 
 
 
@@ -108,10 +106,13 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				loss.backward()
 				# update optimizer
 				if bn % (100 if curr_iter < 200 else 200) == 0:
-					showImage(writer, raw.data, 'train_input')
-					showImage(writer, out.data, 'train_output')
-					showImage(writer, expert.data, 'train_gt')
-					plotSplines(writer, splines, 'splines')
+					showImage(writer, raw.data, 'train_input', curr_iter)
+					showImage(writer, out.data, 'train_output', curr_iter)
+					showImage(writer, expert.data, 'train_gt', curr_iter)
+					plotSplines(writer, splines, 'splines', curr_iter)
+					# add histograms
+					for name, param in spline.named_parameters():
+						writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
 				if bn % 100 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),

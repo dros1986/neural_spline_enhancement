@@ -8,7 +8,7 @@ import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
 from NeuralSpline import NeuralSpline
-from tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import numpy as np
