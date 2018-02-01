@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 from test import test
+import customTransforms
 
 class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
@@ -63,9 +64,15 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# define summary writer
 		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
+		# define transform
+		trans = customTransforms.Compose([
+					customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
+					customTransforms.RandomHorizontalFlip(), \
+					customTransforms.ToTensor(), \
+				])
 		# create dataloader
 		train_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, train_list, include_filenames=False),
+				Dataset(dRaw, dExpert, train_list, trans=trans, include_filenames=False),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),

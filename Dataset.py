@@ -6,11 +6,12 @@ import torch.utils.data as data
 
 
 class Dataset(data.Dataset):
-	def __init__(self, dRaw, dExpert, listfn, include_filenames=False):
+	def __init__(self, dRaw, dExpert, listfn, trans='', include_filenames=False):
 			self.dRaw = dRaw
 			self.dExpert = dExpert
 			self.include_filenames = include_filenames
 			self.listfn = listfn
+			self.trans = trans
 			# read file with filenames
 			in_file = open(listfn,"r")
 			text = in_file.read()
@@ -21,8 +22,13 @@ class Dataset(data.Dataset):
 	def __getitem__(self, index):
 		fn = self.fns[index]
 		# open raw and expert image
-		raw = transforms.ToTensor()(Image.open(os.path.join(self.dRaw,fn)).convert('RGB'))
-		exp = transforms.ToTensor()(Image.open(os.path.join(self.dExpert,fn)).convert('RGB'))
+		raw = Image.open(os.path.join(self.dRaw,fn)).convert('RGB')
+		exp = Image.open(os.path.join(self.dExpert,fn)).convert('RGB')
+		if self.trans:
+			raw,exp = self.trans([raw,exp])
+		else:
+			raw = transforms.ToTensor()(raw)
+			exp = transforms.ToTensor()(exp)
 		# return
 		if self.include_filenames:
 			return raw, exp, fn
