@@ -64,6 +64,13 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# define summary writer
 		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
+		# define number of experts
+		if isinstance(dExpert,str): dExpert = [dExpert]
+		nexperts = len(dExpert)
+		# get experts names
+		experts_names = []
+		for i in range(len(dExpert)):
+			experts_names.append([s for s in dExpert[i].split(os.sep) if s][-1])
 		# define transform
 		trans = customTransforms.Compose([
 					customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
@@ -80,7 +87,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001)
 		# ToDo: load weigths
@@ -93,30 +100,43 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# for each batch
 		curr_iter,best_l2_lab = 0,0
 		for nepoch in range(start_epoch, epochs):
-			for bn, (raw,expert) in enumerate(train_data_loader):
+			for bn, images in enumerate(train_data_loader):
+				raw = images[0]
+				experts = images[1:]
 				#print(bn)
 				start_time = time.time()
 				# reset gradients
 				optimizer.zero_grad()
 				# convert to cuda Variable
-				raw, expert = Variable(raw.cuda()), Variable(expert.cuda(), requires_grad=False)
+				raw = Variable(raw.cuda())
+				for i in range(len(experts)):
+					experts[i] = Variable(experts[i].cuda(), requires_grad=False)
 				# apply spline transform
 				out, splines = spline(raw)
+				# convert to lab
+				out_lab, gt_lab = [],[]
+				for i in range(len(out)):    out_lab.append(spline.rgb2lab(out[i]))
+				for i in range(len(experts)): gt_lab.append(spline.rgb2lab(experts[i]))
 				# calculate loss
-				# loss = F.mse_loss(out,expert)
-				# out = torch.clamp(out,0,1)
-				out_lab, gt_lab = spline.rgb2lab(out), spline.rgb2lab(expert)
-				loss = F.mse_loss(out_lab, gt_lab)
-				# plot loss
+				losses, loss = [], 0
+				for i in range(len(out_lab)):
+					cur_loss = F.mse_loss(out_lab[i], gt_lab[i])
+					losses.append(cur_loss)
+					writer.add_scalar('train_loss_{}'.format(experts_names[i]), cur_loss.data.cpu().mean(), curr_iter)
+					loss += cur_loss
+				# divide loss by the number of experts
+				loss /= len(out_lab)
+				# add scalars
 				writer.add_scalar('train_loss', loss.data.cpu().mean(), curr_iter)
 				# backprop
 				loss.backward()
 				# update optimizer
 				if bn % (100 if curr_iter < 200 else 200) == 0:
 					showImage(writer, raw.data, 'train_input', curr_iter)
-					showImage(writer, out.data, 'train_output', curr_iter)
-					showImage(writer, expert.data, 'train_gt', curr_iter)
-					plotSplines(writer, splines, 'splines', curr_iter)
+					for i in range(len(experts)):
+						showImage(writer, out[i].data, 'train_output_'+experts_names[i], curr_iter)
+						showImage(writer, experts[i].data, 'train_gt_'+experts_names[i], curr_iter)
+						plotSplines(writer, splines[i], 'splines_'+experts_names[i], curr_iter)
 					# add histograms
 					for name, param in spline.named_parameters():
 						writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
@@ -144,16 +164,19 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
 			l2_lab, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
-			writer.add_scalar('L2-LAB', l2_lab, curr_iter)
-			writer.add_scalar('L2-L', l2_l, curr_iter)
+			for i in range(len(l2_lab)):
+				cur_exp_name = experts_names[i]
+				writer.add_scalar('L2-LAB_'+cur_exp_name, l2_lab[i], curr_iter)
+				writer.add_scalar('L2-L_'+cur_exp_name, l2_l[i], curr_iter)
 			# save best model
-			if nepoch == 0 or (nepoch>0 and l2_lab<best_l2_lab):
-				best_l2_lab = l2_lab
+			testid = 2 if len(experts_names)>=4 else 0
+			if nepoch == 0 or (nepoch>0 and l2_lab[testid]<best_l2_lab):
+				best_l2_lab = l2_lab[testid]
 				torch.save({
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-				}, './{}_best_{:.4f}.pth'.format(expname,l2_lab))
+				}, './{}_best_{:.4f}.pth'.format(expname,l2_lab[testid]))
 			# print
-			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab, cols.LIGHT_GRAY, cols.GREEN, l2_l, cols.ENDC))
+			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab[testid], cols.LIGHT_GRAY, cols.GREEN, l2_l[testid], cols.ENDC))
 			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))

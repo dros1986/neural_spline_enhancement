@@ -8,6 +8,8 @@ import torch.utils.data as data
 class Dataset(data.Dataset):
 	def __init__(self, dRaw, dExpert, listfn, trans='', include_filenames=False):
 			self.dRaw = dRaw
+			if isinstance(dExpert, str):
+				dExpert = [dExpert]
 			self.dExpert = dExpert
 			self.include_filenames = include_filenames
 			self.listfn = listfn
@@ -21,18 +23,19 @@ class Dataset(data.Dataset):
 
 	def __getitem__(self, index):
 		fn = self.fns[index]
-		# open raw and expert image
-		raw = Image.open(os.path.join(self.dRaw,fn)).convert('RGB')
-		exp = Image.open(os.path.join(self.dExpert,fn)).convert('RGB')
+		# open images
+		images = [Image.open(os.path.join(self.dRaw,fn)).convert('RGB')]
+		for cur_dexp in self.dExpert:
+			images.append(Image.open(os.path.join(cur_dexp,fn)).convert('RGB'))
+		# apply transforms
 		if self.trans:
-			raw,exp = self.trans([raw,exp])
+			images = self.trans(images)
 		else:
-			raw = transforms.ToTensor()(raw)
-			exp = transforms.ToTensor()(exp)
+			images = [transforms.ToTensor()(images[i]) for i in range(len(images))]
 		# return
 		if self.include_filenames:
-			return raw, exp, fn
-		return raw, exp
+			return images, fn
+		return images # first the raw, then the experts
 
 	def __len__(self):
 		return len(self.fns)

@@ -15,12 +15,13 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc):
+	def __init__(self, n, nc, nexperts):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
 		self.x0 = 0
 		self.step = 1.0 / (n-1.0)
+		self.nexperts = nexperts
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
 		# define net layers
@@ -36,17 +37,22 @@ class NeuralSpline(nn.Module):
 		self.b5 = nn.BatchNorm2d(16*nc)
 
 		self.l1 = nn.Linear(16*nc*7*7, 100*n)
-		self.l2 = nn.Linear(100*n, 3*n)
+		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
-	def rgb2lab(self,x):
+	def rgb2lab(self,x, from_space='srgb'):
 		M,N = x.size(2),x.size(3)
 		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
 		R,G,B = R.view(x.size(0),1,-1),G.view(x.size(0),1,-1),B.view(x.size(0),1,-1)
 		RGB = torch.cat((R,G,B),1)
 		# RGB ProPhoto -> CIELAB XYZ
-		MAT = [[0.7976749, 0.1351917, 0.0313534], \
-		       [0.2880402, 0.7118741, 0.0000857], \
-		       [0.0000000, 0.0000000, 0.8252100]]
+		if from_space=='srgb':
+			MAT = [[0.4124564, 0.3575761, 0.1804375], \
+			       [0.2126729, 0.7151522, 0.0721750], \
+			       [0.0193339, 0.1191920, 0.9503041]]
+		else:
+			MAT = [[0.7976749, 0.1351917, 0.0313534], \
+			       [0.2880402, 0.7118741, 0.0000857], \
+			       [0.0000000, 0.0000000, 0.8252100]]
 		MAT = torch.Tensor(MAT)
 		MAT = MAT.unsqueeze(0).repeat(RGB.size(0),1,1)
 		if isinstance(RGB,Variable): MAT = Variable(MAT,requires_grad=False)
@@ -140,6 +146,23 @@ class NeuralSpline(nn.Module):
 		return res
 
 
+	def enhanceImage(self, input_image, ys):
+		image = input_image.clone()
+		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
+		splines = torch.zeros(3,vals.size(0))
+		# for each channel of the image, define spline and apply it
+		for ch in range(image.size(0)):
+			cur_ch = image[ch,:,:].clone()
+			cur_ys = ys[ch,:].clone()
+			# calculate spline upon identity + found ys
+			identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
+			identity = Variable(identity,requires_grad=False).cuda()
+			cur_coeffs = self.interpolate(cur_ys+identity)
+			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1))
+			splines[ch,:] = self.apply(cur_coeffs,vals).data.cpu()
+		return image, splines
+
+
 	def forward(self, batch):
 		# get xs of the points with CNN
 		ys = self.b1(F.relu(self.c1(batch)))
@@ -150,29 +173,23 @@ class NeuralSpline(nn.Module):
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
-		ys = ys.view(ys.size(0),3,-1)
+		ys = ys.view(ys.size(0),self.nexperts,3,-1)
 		ys /= 100
 		# now we got xs and ys. We need to create the interpolating spline
-		out = Variable(torch.zeros(batch.size())).cuda()
-		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
-		splines = torch.zeros(batch.size(0),3,vals.size(0))
-		# for each image
-		for nimg in range(batch.size(0)):
-			# get image and corresponding ys
-			# cur_img = batch[nimg,:,:,:]
-			# for each channel
-			for ch in range(3):
-				# get current channel
-				cur_ch = batch[nimg,ch,:,:]
-				cur_ys = ys[nimg,ch,:]
-				# interpolate spline with found ys
-				identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
-				identity = Variable(identity,requires_grad=False).cuda()
-				cur_coeffs = self.interpolate(cur_ys+identity)
-				new_ch = self.apply(cur_coeffs, cur_ch.view(-1))
-				splines[nimg,ch,:] = self.apply(cur_coeffs,vals).data.cpu()
-				out[nimg,ch,:,:] = new_ch
-		# return
+		vals = torch.arange(0,1,1.0/255)
+		out = [Variable(torch.zeros(batch.size())).cuda() for i in range(self.nexperts)]
+		splines = [torch.zeros(batch.size(0),3,vals.size(0)) for i in range(self.nexperts)]
+		# for each expert
+		for nexp in range(self.nexperts):
+			# init output vars
+			cur_out = Variable(torch.zeros(batch.size())).cuda()
+			cur_vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
+			cur_splines = torch.zeros(batch.size(0),3,vals.size(0))
+			# enhance each image with the expert spline
+			for nimg in range(batch.size(0)):
+				cur_img = batch[nimg,:,:,:]
+				cur_ys = ys[nimg,nexp,:,:]
+				out[nexp][nimg,:,:,:], splines[nexp][nimg,:,:] = self.enhanceImage(cur_img, cur_ys)
 		return out, splines
 
 
