@@ -1,42 +1,51 @@
 import os,sys
+import argparse
 from train import train
 from test import test
 import torch
 from NeuralSpline import NeuralSpline
 
 
-base_dir = '/media/flavio/Volume/datasets/fivek/'
-dRaw = os.path.join(base_dir,'raw')
-dExpert = [
-			# os.path.join(base_dir,'ExpertA'), \
-			# os.path.join(base_dir,'ExpertB'), \
-			os.path.join(base_dir,'ExpertC'), \
-			# os.path.join(base_dir,'ExpertD'), \
-			# os.path.join(base_dir,'ExpertE'), \
-		  ]
-train_list = os.path.join(base_dir,'train_mit.txt')
-val_list = os.path.join(base_dir,'test_mit_highvar50.txt')
-test_list = os.path.join(base_dir,'test_mit_random250.txt')
-batch_size = 25 #70
-epochs = 2000
-npoints = 10 #4
-nc = 32 #200
-#weights_from = './checkpoints/checkpoint.pth'
-weights_from = ''
-#train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, weights_from=weights_from)
+# parse args
+parser = argparse.ArgumentParser(description='Neural Spline.')
 
-weights_file = './spline_npoints_10_nfilters_32_best_12.0987.pth'
-# weights_file = './spline_npoints_10_nfilters_32.pth'
-out_dir = './regen2/'
-batch_size = 10 #50
-nexperts = len(dExpert)
-# create net
-spline = NeuralSpline(npoints,nc,nexperts).cuda()
-# load weights from net
-state = torch.load(weights_file)
-spline.load_state_dict(state['state_dict'])
-# calculate
-l2_lab, l2_l = test(dRaw, dExpert, test_list, batch_size, spline, outdir=out_dir)
-for i in range(len(l2_lab)):
-	print('{:d}: L2LAB = {:.4f} - L2L = {:.4f}'.format(i,l2_lab[i],l2_l[i]))
-# test(dRaw, dExpert, test_list, batch_size, npoints, nc, weights_file, out_dir)
+parser.add_argument("-i", "--input_dir", help="The input dir containing the raw images.",
+							   default="/media/flavio/Volume/datasets/fivek/raw/")
+parser.add_argument("-e", "--experts_dir", help="The experts dirs containing the gt. Can be more then one.",
+					nargs='+', default=["/media/flavio/Volume/datasets/fivek/ExpertC/"])
+
+parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
+parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
+parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
+parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
+
+parser.add_argument("-tr", "--train", help="Train. Lunch with args <train_txt> <val_txt>",
+					nargs='+', default=["/media/flavio/Volume/datasets/fivek/train_mit.txt", \
+										"/media/flavio/Volume/datasets/fivek/test_mit_highvar50.txt", \
+										""
+										])
+parser.add_argument("-ts", "--test", help="Test. Lunch with arg <test_txt> <model> <outdir>",
+					nargs='+', default=["/media/flavio/Volume/datasets/fivek/test_mit_random250.txt"])
+
+args = parser.parse_args()
+
+# check args
+btrain,btest = True,True
+if not (len(args.train)>=2 and args.batchsize > 0): btrain = False
+if not len(args.test)==3: btest = False
+
+# train if required
+if btrain:
+	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters) #, weights_from=weights_from)
+
+# test
+if btest:
+	# create net
+	spline = NeuralSpline(args.npoints,args.nfilters,args.nexperts).cuda()
+	# load weights from net
+	state = torch.load(args.test[1])
+	spline.load_state_dict(state['state_dict'])
+	# calculate
+	l2_lab, l2_l = test(dRaw, dExpert, args.test[0], args.batchsize, spline, outdir=args.test[2])
+	for i in range(len(l2_lab)):
+		print('{:d}: L2LAB = {:.4f} - L2L = {:.4f}'.format(i,l2_lab[i],l2_l[i]))
