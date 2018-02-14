@@ -47,6 +47,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 			# 	experts[i] = Variable(experts[i].cuda(), requires_grad=False)
 			# apply spline transform
 			out_rgb, splines = spline(raw)
+			# get size of images
+			h,w = out_rgb[i].size(2),out_rgb[i].size(3)
 			# calculate diff
 			for i in range(len(out_rgb)):
 				out_rgb[i] = out_rgb[i].cpu().data
@@ -54,12 +56,13 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 				out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 				# convert to LAB
 				out_lab, gt_lab = spline.rgb2lab(out_rgb[i].cuda()), spline.rgb2lab(experts[i].cuda())
-				# calculate diff # sqrt(sum_c((out_chw,gt_chw)^2))
-				cur_diff = torch.pow((out_lab-gt_lab),2)
-				cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # manca la somma
-				cur_diff_l = torch.sqrt(cur_diff[:,0,:,:])
-				diff_lab[i] = cur_diff_lab if bn==0 else diff_lab[i]+cur_diff_lab
-				diff_l[i] = cur_diff_l if bn==0 else diff_l[i]+cur_diff_l
+				# calculate diff # sqrt(sum_c((out_chw-gt_chw)^2))
+				cur_diff = torch.pow((out_lab-gt_lab),2)         # 10 3 256 256
+				cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # 10 256 256
+				cur_diff_l = torch.sqrt(cur_diff[:,0,:,:])       # 10 256 256
+				# sum all
+				diff_lab[i] += cur_diff_lab.sum()
+				diff_l[i] += cur_diff_l.sum()
 				# save if required
 				if outdir:
 					# save each image
@@ -70,10 +73,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 						cur_img = Image.fromarray(cur_img)
 						cur_img.save(os.path.join(outdir,experts_names[i],cur_fn))
 		# calculate differences
-		l2_lab,l2_l = [],[]
 		for i in range(len(diff_lab)):
-			#l2_lab.append(diff_lab[i].sum() / (nimages*diff_lab[i].size(1)*diff_lab[i].size(2)*diff_lab[i].size(3)))
-			l2_lab.append(diff_lab[i].sum() / (nimages*diff_lab[i].size(1)*diff_lab[i].size(2)))
-			l2_l.append(diff_l[i].sum() / (nimages*diff_l[i].size(1)*diff_l[i].size(2)))
+			diff_lab[i] /= nimages*h*w
+			diff_l[i] /= nimages*h*w
 
-		return l2_lab, l2_l
+		return diff_lab, diff_l
