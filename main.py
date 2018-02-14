@@ -41,11 +41,11 @@ if btrain:
 # test
 if btest:
 	# create net
-	spline = NeuralSpline(args.npoints,args.nfilters,args.nexperts).cuda()
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir)).cuda()
 	# load weights from net
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])
 	# calculate
-	l2_lab, l2_l = test(dRaw, dExpert, args.test[0], args.batchsize, spline, outdir=args.test[2])
+	l2_lab, l2_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, spline, outdir=args.test[2])
 	for i in range(len(l2_lab)):
 		print('{:d}: L2LAB = {:.4f} - L2L = {:.4f}'.format(i,l2_lab[i],l2_l[i]))
