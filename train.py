@@ -60,9 +60,10 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, weights_from=''):
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, exp_name='', weights_from=''):
 		# define summary writer
 		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
+		if exp_name: expname += '_{}'.format(exp_name)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
 		# define number of experts
 		if isinstance(dExpert,str): dExpert = [dExpert]
@@ -89,7 +90,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# create neural spline
 		spline = NeuralSpline(npoints,nc,nexperts).cuda()
 		# define optimizer
-		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001)
+		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001, weight_decay=1e-2) # weight_decay=1e-4 0.005
 		# ToDo: load weigths
 		start_epoch = 0
 		if weights_from:

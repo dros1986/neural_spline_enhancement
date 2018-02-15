@@ -27,6 +27,8 @@ parser.add_argument("-tr", "--train", help="Train. Lunch with args <train_txt> <
 parser.add_argument("-ts", "--test", help="Test. Lunch with arg <test_txt> <model> <outdir>",
 					nargs='+', default=["/media/flavio/Volume/datasets/fivek/test_mit_random250.txt"])
 
+parser.add_argument("-en", "--expname", help="Experiment name.", default='')
+
 args = parser.parse_args()
 
 # check args
@@ -36,7 +38,7 @@ if not len(args.test)==3: btest = False
 
 # train if required
 if btrain:
-	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters) #, weights_from=weights_from)
+	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters, args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
