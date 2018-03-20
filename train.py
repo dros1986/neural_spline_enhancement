@@ -10,6 +10,8 @@ from Dataset import Dataset
 from NeuralSpline import NeuralSpline
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -65,6 +67,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
+		# create models dir
+		if not os.path.isdir('./models/'): os.makedirs('./models/')
 		# define number of experts
 		if isinstance(dExpert,str): dExpert = [dExpert]
 		nexperts = len(dExpert)
@@ -177,7 +181,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-				}, './{}_best_{:.4f}.pth'.format(expname,l2_lab[testid]))
+				}, './models/{}_best_{:.4f}.pth'.format(expname,l2_lab[testid]))
 			# print
 			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab[testid], cols.LIGHT_GRAY, cols.GREEN, l2_l[testid], cols.ENDC))
 			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))
