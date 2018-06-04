@@ -22,19 +22,20 @@ class NeuralSpline(nn.Module):
 		self.x0 = 0
 		self.step = 1.0 / (n-1.0)
 		self.nexperts = nexperts
+		momentum = 0.01
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
 		# define net layers
 		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
-		self.b1 = nn.BatchNorm2d(nc)
+		self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
 		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
-		self.b2 = nn.BatchNorm2d(2*nc)
+		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
 		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
-		self.b3 = nn.BatchNorm2d(4*nc)
+		self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
 		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
-		self.b4 = nn.BatchNorm2d(8*nc)
+		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
-		self.b5 = nn.BatchNorm2d(16*nc)
+		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
 
 		self.l1 = nn.Linear(16*nc*7*7, 100*n)
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
@@ -158,7 +159,7 @@ class NeuralSpline(nn.Module):
 			identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
 			identity = Variable(identity,requires_grad=False).cuda()
 			cur_coeffs = self.interpolate(cur_ys+identity)
-			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1))
+			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1)).view(cur_ch.size())
 			splines[ch,:] = self.apply(cur_coeffs,vals).data.cpu()
 		return image, splines
 

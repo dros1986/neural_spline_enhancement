@@ -17,6 +17,7 @@ from PIL import Image
 
 
 def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
+		spline.eval()
 		# create folder
 		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
 		# get experts names and create corresponding folder
