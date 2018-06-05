@@ -37,7 +37,7 @@ class NeuralSpline(nn.Module):
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
 		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
 
-		self.l1 = nn.Linear(16*nc*7*7, 100*n)
+		self.l1 = nn.Linear(16*nc, 100*n)
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
 	def rgb2lab(self,x, from_space='srgb'):
@@ -171,6 +171,7 @@ class NeuralSpline(nn.Module):
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
 		ys = self.b5(F.relu(self.c5(ys)))
+		ys = F.max_pool2d(ys, kernel_size=7, stride=1)
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
