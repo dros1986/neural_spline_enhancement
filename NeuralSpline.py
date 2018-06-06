@@ -37,7 +37,7 @@ class NeuralSpline(nn.Module):
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
 		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
 
-		self.l1 = nn.Linear(16*nc*7*7, 100*n)
+		self.l1 = nn.Linear(16*nc*1*1, 100*n)  # was 7*7
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
 	def rgb2lab(self,x, from_space='srgb'):
@@ -166,7 +166,8 @@ class NeuralSpline(nn.Module):
 
 	def forward(self, batch):
 		# get xs of the points with CNN
-		ys = self.b1(F.relu(self.c1(batch)))
+		ys = F.avg_pool2d(batch, 4)
+		ys = self.b1(F.relu(self.c1(ys)))
 		ys = self.b2(F.relu(self.c2(ys)))
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
