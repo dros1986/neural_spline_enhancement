@@ -136,7 +136,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# backprop
 				loss.backward()
 				# update optimizer
-				if bn % (100 if curr_iter < 200 else 200) == 0:
+				if bn % 2500 == 0:
 					showImage(writer, raw.data, 'train_input', curr_iter)
 					for i in range(len(experts)):
 						showImage(writer, out[i].data, 'train_output_'+experts_names[i], curr_iter)
@@ -145,7 +145,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					# add histograms
 					for name, param in spline.named_parameters():
 						writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
-				if bn % 100 == 0:
+				if bn % 1000 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),
 						'optimizer': optimizer.state_dict(),
@@ -154,17 +154,18 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update weights
 				optimizer.step()
 				# get time
-				elapsed_time = time.time() - start_time
-				# define string
-				s = \
-					( \
-					 cols.BLUE + '[{:02d}]' + \
-					 cols.BLUE + '[{:03d}/{:3d}]' + \
-					 cols.BLUE + '[{:06d}]' + \
-					 cols.CYAN  + ' tm: ' + cols.BLUE + '{:.4f}' + \
-					 cols.LIGHT_GRAY + ' Loss: ' + cols.GREEN + '{:.4f}' + cols.ENDC \
-					).format(nepoch,bn,train_data_loader.__len__(),curr_iter, elapsed_time, loss.data[0])
-				print(s)
+				if bn % 100 == 0:
+				        elapsed_time = time.time() - start_time
+				        # define string
+				        s = \
+					    ( \
+					      cols.BLUE + '[{:02d}]' + \
+					      cols.BLUE + '[{:03d}/{:3d}]' + \
+					      cols.BLUE + '[{:06d}]' + \
+					      cols.CYAN  + ' tm: ' + cols.BLUE + '{:.4f}' + \
+					      cols.LIGHT_GRAY + ' Loss: ' + cols.GREEN + '{:.4f}' + cols.ENDC \
+					    ).format(nepoch,bn,train_data_loader.__len__(),curr_iter, elapsed_time, loss.data[0])
+				        print(s)
 				# update iter num
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
