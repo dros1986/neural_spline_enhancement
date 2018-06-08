@@ -30,7 +30,7 @@ def showImage(writer, batch, name, n_iter):
 
 def plotSplines(writer, splines, name, n_iter):
 	# get range
-	my_dpi = 100
+	my_dpi = 50  # !!! 100
 	r = torch.arange(0,1,1.0/splines.size(2)).numpy()
 	splines_images = torch.Tensor([])
 	# plot each spline

@@ -14,31 +14,16 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 
-class NeuralSpline(nn.Module):
+class NeuralSplineBase(nn.Module):
 	def __init__(self, n, nc, nexperts):
-		super(NeuralSpline, self).__init__()
+		super().__init__()
 		# define class params
 		self.n = n
 		self.x0 = 0
 		self.step = 1.0 / (n-1.0)
 		self.nexperts = nexperts
-		momentum = 0.01
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
-		# define net layers
-		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
-		self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
-		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
-		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
-		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
-		self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
-		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
-		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
-		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
-		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
-
-		self.l1 = nn.Linear(16*nc*1*1, 100*n)  # was 7*7
-		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
 	def rgb2lab(self,x, from_space='srgb'):
 		M,N = x.size(2),x.size(3)
@@ -163,21 +148,8 @@ class NeuralSpline(nn.Module):
 			splines[ch,:] = self.apply(cur_coeffs,vals).data.cpu()
 		return image, splines
 
-
-	def forward(self, batch):
-		# get xs of the points with CNN
-		ys = F.avg_pool2d(batch, 4)
-		ys = self.b1(F.relu(self.c1(ys)))
-		ys = self.b2(F.relu(self.c2(ys)))
-		ys = self.b3(F.relu(self.c3(ys)))
-		ys = self.b4(F.relu(self.c4(ys)))
-		ys = self.b5(F.relu(self.c5(ys)))
-		ys = ys.view(ys.size(0),-1)
-		ys = F.relu(self.l1(ys))
-		ys = self.l2(ys)
-		ys = ys.view(ys.size(0),self.nexperts,3,-1)
-		ys /= 100
-		# now we got xs and ys. We need to create the interpolating spline
+	def _final_proc(self, batch, ys):
+                # now we got xs and ys. We need to create the interpolating spline
 		vals = torch.arange(0,1,1.0/255)
 		out = [Variable(torch.zeros(batch.size())).cuda() for i in range(self.nexperts)]
 		splines = [torch.zeros(batch.size(0),3,vals.size(0)) for i in range(self.nexperts)]
@@ -195,6 +167,89 @@ class NeuralSpline(nn.Module):
 		return out, splines
 
 
+class NeuralSpline(NeuralSplineBase):
+	def __init__(self, n, nc, nexperts):
+		super().__init__(n, nc, nexperts)
+		momentum = 0.01
+		# define net layers
+		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+		self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
+		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+		self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+
+		self.l1 = nn.Linear(16*nc*3*3, 100*n)  # was 7*7
+		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
+        
+	def forward(self, batch):
+		# get xs of the points with CNN
+		ys = F.avg_pool2d(batch, 2)
+		# ys = self.b1(F.relu(self.c1(ys)))
+		# ys = self.b2(F.relu(self.c2(ys)))
+		# ys = self.b3(F.relu(self.c3(ys)))
+		# ys = self.b4(F.relu(self.c4(ys)))
+		# ys = self.b5(F.relu(self.c5(ys)))
+		ys = F.relu(self.c1(ys))
+		ys = F.relu(self.c2(ys))
+		ys = F.relu(self.c3(ys))
+		ys = F.relu(self.c4(ys))
+		ys = F.relu(self.c5(ys))
+		ys = ys.view(ys.size(0),-1)
+		ys = F.relu(self.l1(ys))
+		ys = self.l2(ys)
+		ys = ys.view(ys.size(0),self.nexperts,3,-1)
+		ys /= 100
+		return self._final_proc(batch, ys)
+
+
+class HDRNet(NeuralSplineBase):
+	"""Replica of the HDRNet from Gharbi et al. (Global path only)."""
+	def __init__(self, n, nc, nexperts):
+		super().__init__(n, nc, nexperts)
+		momentum = 0.01
+		# define net layers
+                # "Splat"
+		self.c1 = nn.Conv2d(3, 8, kernel_size=3, stride=2, padding=1)
+		self.c2 = nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1)
+		self.b2 = nn.BatchNorm2d(16, momentum=momentum)
+		self.c3 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1)
+		self.b3 = nn.BatchNorm2d(32, momentum=momentum)
+		self.c4 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
+		self.b4 = nn.BatchNorm2d(64, momentum=momentum)
+		self.c5 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
+		self.b5 = nn.BatchNorm2d(64, momentum=momentum)
+		self.c6 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
+		self.b6 = nn.BatchNorm2d(64, momentum=momentum)
+
+		self.l1 = nn.Linear(4 * 4 * 64, 256)
+		self.l2 = nn.Linear(256, 128)
+		self.l3 = nn.Linear(128, 64)
+
+		self.l4 = nn.Linear(64, 3 * n *self.nexperts)
+        
+	def forward(self, batch):
+                ys = batch
+                ys = F.relu(self.c1(ys))  # First layer without BN
+                ys = F.relu(self.b2(self.c2(ys)))
+                ys = F.relu(self.b3(self.c3(ys)))
+                ys = F.relu(self.b4(self.c4(ys)))
+                ys = F.relu(self.b5(self.c5(ys)))
+                ys = F.relu(self.b6(self.c6(ys)))
+                ys = ys.view(ys.size(0),-1)
+                ys = F.relu(self.l1(ys))
+                ys = F.relu(self.l2(ys))
+                ys = F.relu(self.l3(ys))
+                ys = self.l4(ys)
+                ys = ys.view(ys.size(0),self.nexperts,3,-1)
+                ys /= 100
+                return self._final_proc(batch, ys)
+        
+
 def unique(tensor1d):
     t, idx = np.unique(tensor1d.numpy(), return_inverse=True)
     return torch.from_numpy(t), torch.from_numpy(idx)
@@ -202,12 +257,13 @@ def unique(tensor1d):
 if __name__ == "__main__":
 	n = 10
 	nf = 100
-	spline = NeuralSpline(n,nf)
+	# spline = NeuralSpline(n, nf, 1)
+	spline = HDRNet(n, nf, 1)
 	spline.cuda()
 	# img = torch.rand(1,3,256,256)
 	# px_vals = unique(img)
 	img = Variable(torch.rand(5,3,256,256)).cuda()
 	out, splines = spline(img)
-	print(out.size())
-	import ipdb; ipdb.set_trace()
+	print(out[0].size())
+	#import ipdb; ipdb.set_trace()
 	#ris = spline(img)
