@@ -27,7 +27,6 @@ class NeuralSpline(nn.Module):
 		self._precalc()
 		# define net layers
 		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
-		self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
 		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
 		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
 		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
@@ -41,9 +40,9 @@ class NeuralSpline(nn.Module):
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
 	def linear_sRGB(self, rgb):
-        T = 0.04045
-        c = (rgb < T).float()
-        return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
+		T = 0.04045
+		c = (rgb < T).float()
+		return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
 
 	def rgb2lab(self,x, from_space='srgb'):
 		# bound input between 0 and 1 in test
@@ -175,7 +174,7 @@ class NeuralSpline(nn.Module):
 
 	def forward(self, batch):
 		# get xs of the points with CNN
-		ys = self.b1(F.relu(self.c1(batch)))
+		ys = F.relu(self.c1(batch))
 		ys = self.b2(F.relu(self.c2(ys)))
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
