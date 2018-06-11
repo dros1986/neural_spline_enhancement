@@ -40,8 +40,8 @@ class NeuralSpline(nn.Module):
 		self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
 		self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
 
-		self.l1 = nn.Linear(64*nc, 100*n)
-		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
+		self.l1 = nn.Linear(64*nc, 32*nc)
+		self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
 
 	def linear_sRGB(self, rgb):
 		T = 0.04045
