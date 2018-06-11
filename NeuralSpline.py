@@ -40,7 +40,16 @@ class NeuralSpline(nn.Module):
 		self.l1 = nn.Linear(16*nc, 100*n)
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
+	def linear_sRGB(self, rgb):
+        T = 0.04045
+        c = (rgb < T).float()
+        return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
+
 	def rgb2lab(self,x, from_space='srgb'):
+		# bound input between 0 and 1 in test
+		if not self.training: x = x.clip(0, 1)
+		# apply gamma correction
+		x = self.linear_sRGB(x)
 		M,N = x.size(2),x.size(3)
 		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
 		R,G,B = R.view(x.size(0),1,-1),G.view(x.size(0),1,-1),B.view(x.size(0),1,-1)
