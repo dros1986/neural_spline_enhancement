@@ -35,8 +35,12 @@ class NeuralSpline(nn.Module):
 		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
 		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+		self.c6 = nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0)
+		self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
+		self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
+		self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
 
-		self.l1 = nn.Linear(16*nc, 100*n)
+		self.l1 = nn.Linear(64*nc, 100*n)
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
 
 	def linear_sRGB(self, rgb):
@@ -46,7 +50,7 @@ class NeuralSpline(nn.Module):
 
 	def rgb2lab(self,x, from_space='srgb'):
 		# bound input between 0 and 1 in test
-		if not self.training: x = x.clip(0, 1)
+		if not self.training: x = x.clamp(0, 1)
 		# apply gamma correction
 		x = self.linear_sRGB(x)
 		M,N = x.size(2),x.size(3)
@@ -179,7 +183,8 @@ class NeuralSpline(nn.Module):
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
 		ys = self.b5(F.relu(self.c5(ys)))
-		ys = F.max_pool2d(ys, kernel_size=7, stride=1)
+		ys = self.b6(F.relu(self.c6(ys)))
+		ys = self.b7(F.relu(self.c7(ys)))
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
