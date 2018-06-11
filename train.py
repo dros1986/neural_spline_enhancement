@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline
+from NeuralSpline import NeuralSpline, HDRNet
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -78,7 +78,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			experts_names.append([s for s in dExpert[i].split(os.sep) if s][-1])
 		# define transform
 		trans = customTransforms.Compose([
-					customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
+					# !!! customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
 					customTransforms.RandomHorizontalFlip(), \
 					customTransforms.ToTensor(), \
 				])
@@ -93,6 +93,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		)
 		# create neural spline
 		spline = NeuralSpline(npoints,nc,nexperts).cuda()
+		# spline = HDRNet(npoints,nc,nexperts).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001, weight_decay=1e-2) # weight_decay=1e-4 0.005
 		# ToDo: load weigths
@@ -169,6 +170,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update iter num
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
+			if nepoch % 10 != 0:
+			        continue
 			l2_lab, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
 			for i in range(len(l2_lab)):
 				cur_exp_name = experts_names[i]

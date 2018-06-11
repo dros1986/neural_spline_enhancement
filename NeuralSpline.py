@@ -13,6 +13,11 @@ from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
 
 
+def linear_sRGB(rgb):
+        T = 0.04045
+        c = (rgb < T).float()
+        return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
+
 
 class NeuralSplineBase(nn.Module):
 	def __init__(self, n, nc, nexperts):
@@ -26,6 +31,9 @@ class NeuralSplineBase(nn.Module):
 		self._precalc()
 
 	def rgb2lab(self,x, from_space='srgb'):
+		if not self.train:
+		        x = x.clip(0, 1)
+		x = linear_sRGB(x)
 		M,N = x.size(2),x.size(3)
 		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
 		R,G,B = R.view(x.size(0),1,-1),G.view(x.size(0),1,-1),B.view(x.size(0),1,-1)
@@ -183,22 +191,19 @@ class NeuralSpline(NeuralSplineBase):
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
 		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
 
-		self.l1 = nn.Linear(16*nc*3*3, 100*n)  # was 7*7
+		self.l1 = nn.Linear(16*nc*1*1, 100*n)  # was 7*7
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
         
 	def forward(self, batch):
 		# get xs of the points with CNN
-		ys = F.avg_pool2d(batch, 2)
-		# ys = self.b1(F.relu(self.c1(ys)))
-		# ys = self.b2(F.relu(self.c2(ys)))
-		# ys = self.b3(F.relu(self.c3(ys)))
-		# ys = self.b4(F.relu(self.c4(ys)))
-		# ys = self.b5(F.relu(self.c5(ys)))
-		ys = F.relu(self.c1(ys))
-		ys = F.relu(self.c2(ys))
-		ys = F.relu(self.c3(ys))
-		ys = F.relu(self.c4(ys))
-		ys = F.relu(self.c5(ys))
+		ys = F.avg_pool2d(batch, 4)
+		# ys = F.relu(self.c1(ys))
+		# ys = F.relu(self.c2(ys))
+		ys = self.b1(F.relu(self.c1(ys)))
+		ys = self.b2(F.relu(self.c2(ys)))
+		ys = self.b3(F.relu(self.c3(ys)))
+		ys = self.b4(F.relu(self.c4(ys)))
+		ys = self.b5(F.relu(self.c5(ys)))
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
@@ -211,7 +216,7 @@ class HDRNet(NeuralSplineBase):
 	"""Replica of the HDRNet from Gharbi et al. (Global path only)."""
 	def __init__(self, n, nc, nexperts):
 		super().__init__(n, nc, nexperts)
-		momentum = 0.01
+		momentum = 0.01   # Tensorflow default is 0.001
 		# define net layers
                 # "Splat"
 		self.c1 = nn.Conv2d(3, 8, kernel_size=3, stride=2, padding=1)
@@ -225,11 +230,13 @@ class HDRNet(NeuralSplineBase):
 		self.b5 = nn.BatchNorm2d(64, momentum=momentum)
 		self.c6 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1)
 		self.b6 = nn.BatchNorm2d(64, momentum=momentum)
-
+                # "Global"
 		self.l1 = nn.Linear(4 * 4 * 64, 256)
+		self.b7 = nn.BatchNorm1d(256, momentum=momentum)
 		self.l2 = nn.Linear(256, 128)
+		self.b8 = nn.BatchNorm1d(128, momentum=momentum)
 		self.l3 = nn.Linear(128, 64)
-
+                # Final map
 		self.l4 = nn.Linear(64, 3 * n *self.nexperts)
         
 	def forward(self, batch):
@@ -241,8 +248,8 @@ class HDRNet(NeuralSplineBase):
                 ys = F.relu(self.b5(self.c5(ys)))
                 ys = F.relu(self.b6(self.c6(ys)))
                 ys = ys.view(ys.size(0),-1)
-                ys = F.relu(self.l1(ys))
-                ys = F.relu(self.l2(ys))
+                ys = F.relu(self.b7(self.l1(ys)))
+                ys = F.relu(self.b8(self.l2(ys)))
                 ys = F.relu(self.l3(ys))
                 ys = self.l4(ys)
                 ys = ys.view(ys.size(0),self.nexperts,3,-1)
