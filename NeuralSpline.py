@@ -185,7 +185,6 @@ class NeuralSpline(nn.Module):
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
-		ys /= 100
 		# now we got xs and ys. We need to create the interpolating spline
 		vals = torch.arange(0,1,1.0/255)
 		out = [Variable(torch.zeros(batch.size())).cuda() for i in range(self.nexperts)]
