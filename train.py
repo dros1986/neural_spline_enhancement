@@ -62,7 +62,7 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, exp_name='', weights_from=''):
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, downsample_strategy='avgpool', exp_name='', weights_from=''):
 		# define summary writer
 		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
@@ -92,7 +92,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc,nexperts).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,downsample_strategy).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001, weight_decay=1e-2) # weight_decay=1e-4 0.005
 		# ToDo: load weigths

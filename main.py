@@ -19,6 +19,9 @@ parser.add_argument("-np", "--npoints",   help="Number of points of the spline."
 parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
 parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
 
+parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
+													[maxpool, avgpool, convs]",     type=str, default='avgpool')
+
 parser.add_argument("-tr", "--train", help="Train. Lunch with args <train_txt> <val_txt>",
 					nargs='+', default=["/media/flavio/Volume/datasets/fivek/train_mit.txt", \
 										"/media/flavio/Volume/datasets/fivek/test_mit_highvar50.txt", \
@@ -38,12 +41,12 @@ if not len(args.test)==3: btest = False
 
 # train if required
 if btrain:
-	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters, args.expname) #, weights_from=weights_from)
+	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters, args.downsample_strategy, args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
 	# create net
-	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir)).cuda()
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir), args.downsample_strategy).cuda()
 	# load weights from net
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])

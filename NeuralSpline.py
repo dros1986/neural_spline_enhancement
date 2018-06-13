@@ -15,7 +15,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc, nexperts):
+	def __init__(self, n, nc, nexperts, downsample_strategy='avgpool'):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
@@ -35,13 +35,26 @@ class NeuralSpline(nn.Module):
 		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
 		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
 		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
-		self.c6 = nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0)
-		self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
-		self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
-		self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
-
-		self.l1 = nn.Linear(64*nc, 32*nc)
-		self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
+		# define downsample layers
+		if downsample_strategy=='maxpool':
+			self.downsample = nn.MaxPool2d(7, stride=1)
+			self.l1 = nn.Linear(16*nc, 16*nc)
+			self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
+		elif downsample_strategy=='avgpool':
+			self.downsample = nn.AvgPool2d(7, stride=1)
+			self.l1 = nn.Linear(16*nc, 16*nc)
+			self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
+		else:
+			self.downsample = nn.Sequential(
+				nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0),
+				nn.BatchNorm2d(32*nc, momentum=momentum),
+				nn.ReLU(True),
+				nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0),
+				nn.BatchNorm2d(64*nc, momentum=momentum),
+				nn.ReLU(True),
+			)
+			self.l1 = nn.Linear(64*nc, 32*nc)
+			self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
 
 	def linear_sRGB(self, rgb):
 		T = 0.04045
@@ -183,8 +196,7 @@ class NeuralSpline(nn.Module):
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
 		ys = self.b5(F.relu(self.c5(ys)))
-		ys = self.b6(F.relu(self.c6(ys)))
-		ys = self.b7(F.relu(self.c7(ys)))
+		ys = self.downsample(ys)
 		ys = ys.view(ys.size(0),-1)
 		ys = F.relu(self.l1(ys))
 		ys = self.l2(ys)
