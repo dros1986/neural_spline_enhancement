@@ -19,6 +19,9 @@ parser.add_argument("-np", "--npoints",   help="Number of points of the spline."
 parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
 parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
 
+parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.001)
+parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
+
 parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
 													[maxpool, avgpool, convs]",     type=str, default='avgpool')
 
@@ -41,7 +44,8 @@ if not len(args.test)==3: btest = False
 
 # train if required
 if btrain:
-	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, args.npoints, args.nfilters, args.downsample_strategy, args.expname) #, weights_from=weights_from)
+	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, \
+		args.npoints, args.nfilters, args.downsample_strategy, args.lr, args.weight_decay, args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
