@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline, HDRNet
+from NeuralSpline import NeuralSpline, HDRNet, Baseline
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 from test import test
 import customTransforms
+import ptcolor
 
 class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
@@ -92,10 +93,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc,nexperts).cuda()
+		# spline = NeuralSpline(npoints,nc,nexperts).cuda()
 		# spline = HDRNet(npoints,nc,nexperts).cuda()
+		spline = Baseline(npoints,nc // 4,nexperts).cuda()
 		# define optimizer
-		optimizer = torch.optim.Adam(spline.parameters(), lr=0.00001, weight_decay=1e-2) # weight_decay=1e-4 0.005
+		optimizer = torch.optim.Adam(spline.parameters(), lr=0.001, weight_decay=1e-1)
 		# ToDo: load weigths
 		start_epoch = 0
 		if weights_from:
@@ -126,7 +128,10 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# calculate loss
 				losses, loss = [], 0
 				for i in range(len(out_lab)):
-					cur_loss = F.mse_loss(out_lab[i], gt_lab[i])
+					cur_loss = torch.mean(ptcolor.squared_deltaE94(gt_lab[i], out_lab[i]))
+					# cur_loss = F.mse_loss(out_lab[i], gt_lab[i])
+					if cur_loss > 50 and nepoch > 1:
+					        torch.save({"out": out[i], "experts": experts[i], "lss": cur_loss, "epoch": nepoch}, "err.pth")
 					losses.append(cur_loss)
 					writer.add_scalar('train_loss_{}'.format(experts_names[i]), cur_loss.data.cpu().mean(), curr_iter)
 					loss += cur_loss
@@ -144,8 +149,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						showImage(writer, experts[i].data, 'train_gt_'+experts_names[i], curr_iter)
 						plotSplines(writer, splines[i], 'splines_'+experts_names[i], curr_iter)
 					# add histograms
-					for name, param in spline.named_parameters():
-						writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
+					# !!! for name, param in spline.named_parameters():
+					# !!!	writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
 				if bn % 1000 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),

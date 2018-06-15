@@ -7,12 +7,13 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline
+from NeuralSpline import NeuralSpline, HDRNet, Baseline
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+import ptcolor
 
 
 
@@ -59,7 +60,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 				out_lab, gt_lab = spline.rgb2lab(out_rgb[i].cuda()), spline.rgb2lab(experts[i].cuda())
 				# calculate diff # sqrt(sum_c((out_chw-gt_chw)^2))
 				cur_diff = torch.pow((out_lab-gt_lab),2)         # 10 3 256 256
-				cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # 10 256 256
+				# cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # 10 256 256
+				cur_diff_lab = ptcolor.deltaE94(gt_lab, out_lab).squeeze(1)  # !!!
 				cur_diff_l = torch.sqrt(cur_diff[:,0,:,:])       # 10 256 256
 				# sum all
 				diff_lab[i] += cur_diff_lab.sum()

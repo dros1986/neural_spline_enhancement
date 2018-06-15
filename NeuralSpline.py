@@ -11,6 +11,7 @@ from multiprocessing import cpu_count
 import numpy as np
 from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
+import ptcolor
 
 
 def linear_sRGB(rgb):
@@ -31,8 +32,9 @@ class NeuralSplineBase(nn.Module):
 		self._precalc()
 
 	def rgb2lab(self,x, from_space='srgb'):
-		if not self.train:
-		        x = x.clip(0, 1)
+		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=False)
+		if not self.training:
+		        x = x.clamp(0, 1)
 		x = linear_sRGB(x)
 		M,N = x.size(2),x.size(3)
 		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
@@ -139,7 +141,6 @@ class NeuralSplineBase(nn.Module):
 		# return
 		return res
 
-
 	def enhanceImage(self, input_image, ys):
 		image = input_image.clone()
 		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
@@ -196,20 +197,64 @@ class NeuralSpline(NeuralSplineBase):
         
 	def forward(self, batch):
 		# get xs of the points with CNN
-		ys = F.avg_pool2d(batch, 4)
+                ys = F.avg_pool2d(batch, 4)
 		# ys = F.relu(self.c1(ys))
 		# ys = F.relu(self.c2(ys))
-		ys = self.b1(F.relu(self.c1(ys)))
+                ys = self.b1(F.relu(self.c1(ys)))
+                ys = self.b2(F.relu(self.c2(ys)))
+                ys = self.b3(F.relu(self.c3(ys)))
+                ys = self.b4(F.relu(self.c4(ys)))
+                ys = self.b5(F.relu(self.c5(ys)))
+                ys = ys.view(ys.size(0),-1)
+                ys = F.relu(self.l1(ys))
+                ys = self.l2(ys)
+                ys = ys.view(ys.size(0),self.nexperts,3,-1)
+                ys /= 100
+                return self._final_proc(batch, ys)
+
+
+class Baseline(NeuralSplineBase):
+	def __init__(self, n, nc, nexperts):
+		super().__init__(n, nc, nexperts)
+		momentum = 0.01
+		# define net layers
+		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+		# self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
+		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+		self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+		# self.c6 = nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0)
+		# self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
+		# self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
+		# self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
+		self.l1 = nn.Linear(16*nc, 16*nc)
+		self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
+        
+	def forward(self, batch):
+		# get xs of the points with CNN
+		ys = batch
+		ys = F.relu(self.c1(ys))
 		ys = self.b2(F.relu(self.c2(ys)))
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
 		ys = self.b5(F.relu(self.c5(ys)))
+		# ys = self.b6(F.relu(self.c6(ys)))
+		# ys = self.b7(F.relu(self.c7(ys)))
+		ys = F.avg_pool2d(ys, ys.size(2))
 		ys = ys.view(ys.size(0),-1)
+		ys = F.dropout(ys, training=self.training)
 		ys = F.relu(self.l1(ys))
+		ys = F.dropout(ys, training=self.training)
 		ys = self.l2(ys)
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
-		ys /= 100
-		return self._final_proc(batch, ys)
+		# a, b = self._final_proc(batch, ys)  # !!!
+		# return [F.sigmoid(a[0])], b              # !!!  
+		return self._final_proc(batch, ys)  # !!!        
 
 
 class HDRNet(NeuralSplineBase):
