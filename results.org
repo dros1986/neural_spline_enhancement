@@ -1,0 +1,38 @@
+
+
+|-------------------+---------+---------+----------+----------+-------------------------------------------|
+| Ver.              | Test-DE | Test-DL | Train-DE | Train-DL | Note                                      |
+|-------------------+---------+---------+----------+----------+-------------------------------------------|
+| master            | 10.6690 |  5.1134 |   4.4925 |   1.9094 | Versione addestrata da Flavio             |
+| master            | 11.9839 |  5.3833 |   5.1582 |   2.3258 | Versione riaddestrata (nuovo BN)          |
+| downsampling      | 10.0867 |  4.9716 |   8.9701 |   4.7745 | Downsampling iniziale 4x4                 |
+| downsampling      | 10.1862 |  4.8764 |   8.9387 |   4.7846 | Downsampling iniziale 2x2                 |
+| downsampling2xbn  |  9.8445 |  4.8227 |   8.7972 |   4.7021 | Down 2x2; No BN dopo le prime due conv.   |
+| downsampling2xbn5 | 10.1952 |  4.9950 |   9.2923 |   4.9552 | Down 2x2; No BN                           |
+| down4g            |  9.1347 |  4.0025 |   8.1967 |   3.9203 | Down 4x4; no gamma                        |
+
+
+
+With Gamma removal
+
+|------------+---------+---------+----------+----------+----------|
+| Ver.       | Test-DE | Test-DL | Train-DE | Train-DL | Note     |
+|------------+---------+---------+----------+----------+----------|
+| down4gxbn1 | 10.6878 |  5.9276 |   9.6008 |   5.5742 | Down 4x4 |
+|------------+---------+---------+----------+----------+----------|
+
+
+
+
+TODO:
+- [X] Downasmpling
+- [X] Check Batchnorm
+- [ ] Dropout
+- [ ] No random resize
+- [ ] Random crop
+- [ ] Remove the gamma
+
+- [ ] GT Distribution
+- [ ] Reproduce HDRNet
+
+- [ ] GT -> GT nel training set?
