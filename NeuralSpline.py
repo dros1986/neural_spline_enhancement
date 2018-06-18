@@ -142,7 +142,7 @@ class NeuralSpline(NeuralSplineBase):
 
 		self.l1 = nn.Linear(16*nc*1*1, 100*n)  # was 7*7
 		self.l2 = nn.Linear(100*n, 3*n*self.nexperts)
-        
+
 	def forward(self, batch):
 		# get xs of the points with CNN
                 ys = F.avg_pool2d(batch, 4)
@@ -180,9 +180,11 @@ class Baseline(NeuralSplineBase):
 		# self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
 		# self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
 		# self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
-		self.l1 = nn.Linear(16*nc, 16*nc)
-		self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
-        
+		self.l1 = nn.Linear(16*nc, 3*n*self.nexperts)
+		# self.l1 = nn.Linear(16*nc, 16*nc)                
+		# self.l2 = nn.Linear(16*nc, 16*nc)
+		# self.l3 = nn.Linear(16*nc, 3*n*self.nexperts)
+
 	def forward(self, batch):
 		# get xs of the points with CNN
 		ys = batch
@@ -196,13 +198,14 @@ class Baseline(NeuralSplineBase):
 		ys = F.avg_pool2d(ys, ys.size(2))
 		ys = ys.view(ys.size(0),-1)
 		ys = F.dropout(ys, training=self.training)
-		ys = F.relu(self.l1(ys))
-		ys = F.dropout(ys, training=self.training)
-		ys = self.l2(ys)
+		# ys = F.relu(self.l1(ys))
+		# ys = F.dropout(ys, training=self.training)
+		# ys = F.relu(self.l2(ys))
+		# ys = F.dropout(ys, training=self.training)
+		# ys = self.l3(ys)
+		ys = self.l1(ys)                
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
-		# a, b = self._final_proc(batch, ys)  # !!!
-		# return [F.sigmoid(a[0])], b              # !!!  
-		return self._final_proc(batch, ys)  # !!!        
+		return self._final_proc(batch, ys)
 
 
 class HDRNet(NeuralSplineBase):
@@ -231,7 +234,7 @@ class HDRNet(NeuralSplineBase):
 		self.l3 = nn.Linear(128, 64)
                 # Final map
 		self.l4 = nn.Linear(64, 3 * n *self.nexperts)
-        
+
 	def forward(self, batch):
                 ys = batch
                 ys = F.relu(self.c1(ys))  # First layer without BN
@@ -248,7 +251,7 @@ class HDRNet(NeuralSplineBase):
                 ys = ys.view(ys.size(0),self.nexperts,3,-1)
                 ys /= 100
                 return self._final_proc(batch, ys)
-        
+
 
 def unique(tensor1d):
     t, idx = np.unique(tensor1d.numpy(), return_inverse=True)
