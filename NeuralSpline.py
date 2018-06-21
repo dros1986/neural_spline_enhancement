@@ -1,5 +1,6 @@
 import os,sys, math, argparse
 import torch
+import torchvision
 import torch.nn as nn
 import torch.nn.init as winit
 from torch.autograd import Variable
@@ -180,7 +181,7 @@ class Baseline(NeuralSplineBase):
 		# self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
 		# self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
 		# self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
-		self.l1 = nn.Linear(16*nc, 16*nc)                
+		self.l1 = nn.Linear(16*nc, 16*nc)
 		self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
 
 	def forward(self, batch):
@@ -248,15 +249,70 @@ class HDRNet(NeuralSplineBase):
                 return self._final_proc(batch, ys)
 
 
+class Resnet50(NeuralSplineBase):
+	def __init__(self, n, nc, nexperts):
+		super().__init__(n, nc, nexperts)
+		momentum = 0.01
+		# define net layers
+		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+		self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+		self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+		self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+		self.resnet = torchvision.models.resnet50(True)
+		for param in self.resnet.parameters():
+		        param.requires_grad = False
+		self.l0 = nn.Linear(1000, 16*nc, bias=False)
+		self.l1 = nn.Linear(16*nc, 16*nc)
+		self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
+
+	def features(self, batch):
+                xs = batch[:, :, 16:-16, 16:-16]
+                m = xs.new_tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+                d = xs.new_tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+                xs = (xs - m) / d
+                return self.resnet(xs)
+                
+	def forward(self, batch):
+		# get xs of the points with CNN
+		ys = batch
+		ys = F.relu(self.c1(ys))
+		ys = self.b2(F.relu(self.c2(ys)))
+		ys = self.b3(F.relu(self.c3(ys)))
+		ys = self.b4(F.relu(self.c4(ys)))
+		ys = self.b5(F.relu(self.c5(ys)))
+		ys = F.avg_pool2d(ys, ys.size(2))
+		ys = ys.view(ys.size(0),-1)
+		ys = F.dropout(ys, training=self.training)
+
+		fs = self.features(batch)
+		# ma = torch.max(fs, 1, keepdim=True)[0]
+		# fs = (fs >= ma).float()
+		fs = F.dropout(fs, training=self.training)
+		fs = F.relu(self.l0(fs))
+
+		ys = F.relu(self.l1(ys + fs))
+		ys = F.dropout(ys, training=self.training)
+		ys = self.l2(ys)
+		ys = ys.view(ys.size(0),self.nexperts,3,-1)
+		return self._final_proc(batch, ys)
+
+
 def unique(tensor1d):
     t, idx = np.unique(tensor1d.numpy(), return_inverse=True)
     return torch.from_numpy(t), torch.from_numpy(idx)
+
 
 if __name__ == "__main__":
 	n = 10
 	nf = 100
 	# spline = NeuralSpline(n, nf, 1)
-	spline = HDRNet(n, nf, 1)
+	# spline = HDRNet(n, nf, 1)
+	spline = Resnet50(n, nf, 1)
 	spline.cuda()
 	# img = torch.rand(1,3,256,256)
 	# px_vals = unique(img)
