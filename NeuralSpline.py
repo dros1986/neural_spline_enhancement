@@ -57,11 +57,6 @@ class NeuralSpline(nn.Module):
 			self.l1 = nn.Linear(64*nc, 32*nc)
 			self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
 
-	def linear_sRGB(self, rgb):
-		T = 0.04045
-		c = (rgb < T).float()
-		return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
-
 	def rgb2lab(self,x, from_space='srgb'):
 		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
 
