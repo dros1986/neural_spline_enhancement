@@ -11,6 +11,7 @@ from multiprocessing import cpu_count
 import numpy as np
 from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
+import ptcolor
 
 
 
@@ -62,58 +63,7 @@ class NeuralSpline(nn.Module):
 		return c * rgb / 12.92 + (1 - c) * torch.pow(torch.abs(rgb + 0.055) / 1.055, 2.4)
 
 	def rgb2lab(self,x, from_space='srgb'):
-		# bound input between 0 and 1 in test
-		if not self.training: x = x.clamp(0, 1)
-		# apply gamma correction
-		x = self.linear_sRGB(x)
-		M,N = x.size(2),x.size(3)
-		R,G,B = x[:,0,:,:].contiguous(),x[:,1,:,:].contiguous(),x[:,2,:,:].contiguous()
-		R,G,B = R.view(x.size(0),1,-1),G.view(x.size(0),1,-1),B.view(x.size(0),1,-1)
-		RGB = torch.cat((R,G,B),1)
-		# RGB ProPhoto -> CIELAB XYZ
-		if from_space=='srgb':
-			MAT = [[0.4124564, 0.3575761, 0.1804375], \
-			       [0.2126729, 0.7151522, 0.0721750], \
-			       [0.0193339, 0.1191920, 0.9503041]]
-		else:
-			MAT = [[0.7976749, 0.1351917, 0.0313534], \
-			       [0.2880402, 0.7118741, 0.0000857], \
-			       [0.0000000, 0.0000000, 0.8252100]]
-		MAT = torch.Tensor(MAT)
-		MAT = MAT.unsqueeze(0).repeat(RGB.size(0),1,1)
-		if isinstance(RGB,Variable): MAT = Variable(MAT,requires_grad=False)
-		if RGB.is_cuda: MAT = MAT.cuda()
-		XYZ = torch.bmm(MAT,RGB)
-		# Normalize for D65 white point
-		X = XYZ[:,0,:]/0.950456
-		Y = XYZ[:,1,:]
-		Z = XYZ[:,2,:]/1.088754
-		T = 0.008856
-		XT,YT,ZT = X>T, Y>T, Z>T
-		XT,YT,ZT = XT.float(), YT.float(), ZT.float()
-		mn = torch.Tensor([T]).cuda()
-		if isinstance(Y,Variable):
-			mn = Variable(mn, requires_grad=False)
-		Y3 = torch.max(Y,mn)**(1.0/3)
-		fX = XT * torch.max(X,mn)**(1.0/3) + (1-XT) * (7.787*X + 16.0/116)
-		fY = YT * Y3 + (1-YT) * (7.787 * Y + 16.0/116)
-		fZ = ZT * torch.max(Z,mn)**(1.0/3) + (1-ZT) * (7.787*Z + 16.0/116)
-		# debug
-		# if np.isnan(np.sum(fZ.data.cpu().numpy())):
-		# 	print('ERRORE')
-		# get LAB channels
-		L = YT * (116.0 * Y3 - 16.0) + (1-YT) * (903.3 * Y)
-		a = 500 * (fX - fY)
-		b = 200 * (fY - fZ)
-		L,a,b = L.view(-1,1,M,N), a.view(-1,1,M,N), b.view(-1,1,M,N)
-		# return
-		LAB = torch.cat((L,a,b),1)
-		return LAB
-		# PROVA
-		# X,Y,Z = X.contiguous(),Y.contiguous(),Z.contiguous()
-		# X,Y,Z = X.view(-1,1,M,N), Y.view(-1,1,M,N), Z.view(-1,1,M,N)
-		# XYZ = torch.cat((X,Y,Z),1)
-		# return XYZ
+		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
 
 
 	def _precalc(self):
