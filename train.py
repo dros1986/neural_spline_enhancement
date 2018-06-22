@@ -151,7 +151,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						'state_dict': spline.state_dict(),
 						'optimizer': optimizer.state_dict(),
 						'nepoch' : nepoch,
-					}, './{}.pth'.format(expname))
+					}, './models/{}.pth'.format(expname))
 				# update weights
 				optimizer.step()
 				# get time
@@ -182,7 +182,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-				}, './models/{}_best_{:.4f}.pth'.format(expname,l2_lab[testid]))
+					'l2_lab' : l2_lab[testid],
+				}, './models/{}_best.pth'.format(expname))
 			# print
 			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab[testid], cols.LIGHT_GRAY, cols.GREEN, l2_l[testid], cols.ENDC))
 			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))
