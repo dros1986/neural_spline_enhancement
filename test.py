@@ -2,7 +2,6 @@ import os,sys,math,time,io
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
@@ -42,8 +41,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 			raw = images[0]
 			experts = images[1:]
 			nimages += experts[0].size(0)
-			# convert to cuda variable
-			raw = Variable(raw.cuda())
+			# to GPU
+			raw = raw.cuda()
 			# for i in range(len(experts)):
 			# 	experts[i] = Variable(experts[i].cuda(), requires_grad=False)
 			# apply spline transform

@@ -2,7 +2,6 @@ import os,sys,math,time,io
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
@@ -113,10 +112,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				start_time = time.time()
 				# reset gradients
 				optimizer.zero_grad()
-				# convert to cuda Variable
-				raw = Variable(raw.cuda())
-				for i in range(len(experts)):
-					experts[i] = Variable(experts[i].cuda(), requires_grad=False)
+				# send to GPU
+				raw = raw.cuda()
+				for i in range(len(experts)): experts[i] = experts[i].cuda()
+				# force gradient saving
+				raw.requires_grad = True
 				# apply spline transform
 				out, splines = spline(raw)
 				# convert to lab

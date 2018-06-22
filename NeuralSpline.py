@@ -2,7 +2,6 @@ import os,sys, math, argparse
 import torch
 import torch.nn as nn
 import torch.nn.init as winit
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms, utils
@@ -79,7 +78,7 @@ class NeuralSpline(nn.Module):
 		np.fill_diagonal(B[:, 2:], 1)
 		self.matrix = np.dot(A, B)
 		self.matrix = torch.from_numpy(self.matrix).float()
-		self.matrix = Variable(self.matrix,requires_grad=False).cuda()
+		self.matrix = self.matrix.cuda()
 
 	def interpolate(self, ys):
 		""" compute the coefficients of the polynomials
@@ -101,7 +100,7 @@ class NeuralSpline(nn.Module):
 		xi = torch.clamp((x - self.x0) / self.step, 0, self.n-2)
 		xi = torch.floor(xi)
 		xf = x - self.x0 - xi*self.step
-		ones = Variable(torch.ones(xf.size()),requires_grad=False).cuda()
+		ones = torch.ones(xf.size()).cuda()
 		ex = torch.stack([xf ** 3, xf ** 2, xf, ones], dim=0)
 		#y = np.dot(coeffs.transpose(0,1), ex)
 		y = torch.mm(coeffs.transpose(0,1), ex)
@@ -109,7 +108,6 @@ class NeuralSpline(nn.Module):
 		sel_mat = torch.zeros(y.size(0),xi.size(0)).cuda()
 		rng = torch.arange(0,xi.size(0)).cuda()
 		sel_mat[xi.data.long(),rng.long()]=1
-		sel_mat = Variable(sel_mat, requires_grad=False)
 		# multiply to get the right coeffs
 		res = y*sel_mat
 		res = res.sum(0)
@@ -119,7 +117,7 @@ class NeuralSpline(nn.Module):
 
 	def enhanceImage(self, input_image, ys):
 		image = input_image.clone()
-		vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
+		vals = torch.arange(0,1,1.0/255).cuda()
 		splines = torch.zeros(3,vals.size(0))
 		# for each channel of the image, define spline and apply it
 		for ch in range(image.size(0)):
@@ -127,7 +125,7 @@ class NeuralSpline(nn.Module):
 			cur_ys = ys[ch,:].clone()
 			# calculate spline upon identity + found ys
 			identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
-			identity = Variable(identity,requires_grad=False).cuda()
+			identity = identity.cuda()
 			cur_coeffs = self.interpolate(cur_ys+identity)
 			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1)).view(cur_ch.size())
 			splines[ch,:] = self.apply(cur_coeffs,vals).data.cpu()
@@ -148,13 +146,13 @@ class NeuralSpline(nn.Module):
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
 		# now we got xs and ys. We need to create the interpolating spline
 		vals = torch.arange(0,1,1.0/255)
-		out = [Variable(torch.zeros(batch.size())).cuda() for i in range(self.nexperts)]
+		out = [torch.zeros(batch.size()).cuda() for i in range(self.nexperts)]
 		splines = [torch.zeros(batch.size(0),3,vals.size(0)) for i in range(self.nexperts)]
 		# for each expert
 		for nexp in range(self.nexperts):
 			# init output vars
-			cur_out = Variable(torch.zeros(batch.size())).cuda()
-			cur_vals = Variable(torch.arange(0,1,1.0/255),requires_grad=False).cuda()
+			cur_out = torch.zeros(batch.size()).cuda()
+			cur_vals = torch.arange(0,1,1.0/255).cuda()
 			cur_splines = torch.zeros(batch.size(0),3,vals.size(0))
 			# enhance each image with the expert spline
 			for nimg in range(batch.size(0)):
@@ -175,7 +173,7 @@ if __name__ == "__main__":
 	spline.cuda()
 	# img = torch.rand(1,3,256,256)
 	# px_vals = unique(img)
-	img = Variable(torch.rand(5,3,256,256)).cuda()
+	img = torch.rand(5,3,256,256).cuda()
 	out, splines = spline(img)
 	print(out.size())
 	import ipdb; ipdb.set_trace()
