@@ -65,7 +65,7 @@ def plotSplines(writer, splines, name, n_iter):
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, downsample_strategy='avgpool', \
 													lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
 		# define summary writer
-		expname = 'spline_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
+		expname = 'spline_rgb_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
 		# create models dir
