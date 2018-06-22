@@ -50,7 +50,7 @@ if btrain:
 # test
 if btest:
 	# create net
-	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir), args.downsample_strategy).cuda()
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),apply_to='rgb',downsample_strategy=args.downsample_strategy).cuda()
 	# load weights from net
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])

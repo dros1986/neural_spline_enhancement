@@ -15,13 +15,19 @@ import ptcolor
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc, nexperts, downsample_strategy='avgpool'):
+	def __init__(self, n, nc, nexperts, apply_to='rgb', downsample_strategy='avgpool'):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
 		self.x0 = 0
 		self.step = 1.0 / (n-1.0)
 		self.nexperts = nexperts
+		self.apply_to = apply_to
+		# define fixed tensors to speed up computation
+		if self.apply_to=='rgb':
+			self.xs = torch.arange(0,1,1.0/255).cuda()
+		else:
+			self.xs = torch.arange(-100,100,1.0/200).cuda()
 		momentum = 0.01
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
@@ -56,7 +62,7 @@ class NeuralSpline(nn.Module):
 			self.l1 = nn.Linear(64*nc, 32*nc)
 			self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
 
-	def rgb2lab(self,x, from_space='srgb'):
+	def rgb2lab(self, x):
 		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
 
 
@@ -117,8 +123,7 @@ class NeuralSpline(nn.Module):
 
 	def enhanceImage(self, input_image, ys):
 		image = input_image.clone()
-		vals = torch.arange(0,1,1.0/255).cuda()
-		splines = torch.zeros(3,vals.size(0))
+		splines = torch.zeros(3,self.xs.size(0))
 		# for each channel of the image, define spline and apply it
 		for ch in range(image.size(0)):
 			cur_ch = image[ch,:,:].clone()
@@ -128,7 +133,7 @@ class NeuralSpline(nn.Module):
 			identity = identity.cuda()
 			cur_coeffs = self.interpolate(cur_ys+identity)
 			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1)).view(cur_ch.size())
-			splines[ch,:] = self.apply(cur_coeffs,vals).data.cpu()
+			splines[ch,:] = self.apply(cur_coeffs,self.xs).data.cpu()
 		return image, splines
 
 
@@ -145,15 +150,13 @@ class NeuralSpline(nn.Module):
 		ys = self.l2(ys)
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
 		# now we got xs and ys. We need to create the interpolating spline
-		vals = torch.arange(0,1,1.0/255)
 		out = [torch.zeros(batch.size()).cuda() for i in range(self.nexperts)]
-		splines = [torch.zeros(batch.size(0),3,vals.size(0)) for i in range(self.nexperts)]
+		splines = [torch.zeros(batch.size(0),3,self.xs.size(0)) for i in range(self.nexperts)]
 		# for each expert
 		for nexp in range(self.nexperts):
 			# init output vars
 			cur_out = torch.zeros(batch.size()).cuda()
-			cur_vals = torch.arange(0,1,1.0/255).cuda()
-			cur_splines = torch.zeros(batch.size(0),3,vals.size(0))
+			cur_splines = torch.zeros(batch.size(0),3,self.xs.size(0))
 			# enhance each image with the expert spline
 			for nimg in range(batch.size(0)):
 				cur_img = batch[nimg,:,:,:]

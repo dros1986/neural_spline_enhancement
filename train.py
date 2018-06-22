@@ -92,7 +92,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc,nexperts,downsample_strategy).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,apply_to='rgb',downsample_strategy=downsample_strategy).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
