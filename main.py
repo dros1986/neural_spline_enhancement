@@ -22,6 +22,8 @@ parser.add_argument("-nf", "--nfilters",  help="Number of filters.",            
 parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.001)
 parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
 
+parser.add_argument("-cs", "--colorspace",  help="Colorspace to which is applied the spline.", type=str, default='rgb')
+
 parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
 													[maxpool, avgpool, convs]",     type=str, default='avgpool')
 
@@ -45,12 +47,13 @@ if not len(args.test)==3: btest = False
 # train if required
 if btrain:
 	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, \
-		args.npoints, args.nfilters, args.downsample_strategy, args.lr, args.weight_decay, args.expname) #, weights_from=weights_from)
+		args.npoints, args.nfilters, apply_to=args.colorspace, downsample_strategy=args.downsample_strategy, \
+		lr=args.lr, weight_decay=args.weight_decay, exp_name=args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
 	# create net
-	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),apply_to='rgb',downsample_strategy=args.downsample_strategy).cuda()
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),apply_to=args.colorspace,downsample_strategy=args.downsample_strategy).cuda()
 	# load weights from net
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])

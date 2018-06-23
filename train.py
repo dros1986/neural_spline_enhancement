@@ -61,10 +61,10 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, downsample_strategy='avgpool', \
-													lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, apply_to='rgb', \
+		  downsample_strategy='avgpool', lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
 		# define summary writer
-		expname = 'spline_rgb_npoints_{:d}_nfilters_{:d}'.format(npoints,nc)
+		expname = 'spline_{}_npoints_{:d}_nfilters_{:d}'.format(apply_to,npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
 		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
 		# create models dir
@@ -92,7 +92,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc,nexperts,apply_to='rgb',downsample_strategy=downsample_strategy).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,apply_to=apply_to,downsample_strategy=downsample_strategy).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
@@ -106,6 +106,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		curr_iter,best_l2_lab = 0,0
 		for nepoch in range(start_epoch, epochs):
 			for bn, images in enumerate(train_data_loader):
+				spline.train()
 				raw = images[0]
 				experts = images[1:]
 				#print(bn)
@@ -121,8 +122,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				out, splines = spline(raw)
 				# convert to lab
 				out_lab, gt_lab = [],[]
-				for i in range(len(out)):    out_lab.append(spline.rgb2lab(out[i]))
 				for i in range(len(experts)): gt_lab.append(spline.rgb2lab(experts[i]))
+				if apply_to=='rgb':
+					for i in range(len(out)): out_lab.append(spline.rgb2lab(out[i]))
+				else:
+					out_lab = out
 				# calculate loss
 				losses, loss = [], 0
 				for i in range(len(out_lab)):
@@ -133,19 +137,20 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# divide loss by the number of experts
 				loss /= len(out_lab)
 				# add scalars
-				writer.add_scalar('train_loss', loss.data.cpu().mean(), curr_iter)
+				writer.add_scalar('train_loss', loss.cpu().mean(), curr_iter)
 				# backprop
 				loss.backward()
 				# update optimizer
 				if bn % (100 if curr_iter < 200 else 200) == 0:
-					showImage(writer, raw.data, 'train_input', curr_iter)
+					showImage(writer, raw, 'train_input', curr_iter)
 					for i in range(len(experts)):
-						showImage(writer, out[i].data, 'train_output_'+experts_names[i], curr_iter)
-						showImage(writer, experts[i].data, 'train_gt_'+experts_names[i], curr_iter)
+						cur_out = out[i] if apply_to=='rgb' else spline.lab2rgb(out[i])
+						showImage(writer, cur_out.detach(), 'train_output_'+experts_names[i], curr_iter)
+						showImage(writer, experts[i], 'train_gt_'+experts_names[i], curr_iter)
 						plotSplines(writer, splines[i], 'splines_'+experts_names[i], curr_iter)
 					# add histograms
 					for name, param in spline.named_parameters():
-						writer.add_histogram(name, param.clone().cpu().data.numpy(), curr_iter)
+						writer.add_histogram(name, param.detach().cpu().numpy(), curr_iter)
 				if bn % 100 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),
@@ -164,7 +169,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 					 cols.BLUE + '[{:06d}]' + \
 					 cols.CYAN  + ' tm: ' + cols.BLUE + '{:.4f}' + \
 					 cols.LIGHT_GRAY + ' Loss: ' + cols.GREEN + '{:.4f}' + cols.ENDC \
-					).format(nepoch,bn,train_data_loader.__len__(),curr_iter, elapsed_time, loss.data[0])
+					).format(nepoch,bn,train_data_loader.__len__(),curr_iter, elapsed_time, loss.item())
 				print(s)
 				# update iter num
 				curr_iter = curr_iter + 1

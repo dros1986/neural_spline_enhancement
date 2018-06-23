@@ -24,10 +24,7 @@ class NeuralSpline(nn.Module):
 		self.nexperts = nexperts
 		self.apply_to = apply_to
 		# define fixed tensors to speed up computation
-		if self.apply_to=='rgb':
-			self.xs = torch.arange(0,1,1.0/255).cuda()
-		else:
-			self.xs = torch.arange(-100,100,1.0/200).cuda()
+		self.xs = torch.arange(0,1,1.0/255.).cuda()
 		momentum = 0.01
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
@@ -65,6 +62,8 @@ class NeuralSpline(nn.Module):
 	def rgb2lab(self, x):
 		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
 
+	def lab2rgb(self, x):
+		return ptcolor.lab2rgb(x, white_point="d65", gamma_correction=True, clip_rgb=not self.training)
 
 	def _precalc(self):
 		""" Calculate interpolation mat for finding Ms.
@@ -138,8 +137,15 @@ class NeuralSpline(nn.Module):
 
 
 	def forward(self, batch):
+		# convert to lab if required
+		if self.apply_to=='lab': batch = self.rgb2lab(batch)
+		# resize if needed
+		if not (batch.size(2) == 256 and batch.size(3) == 256):
+			smallbatch = F.upsample(batch, size=(256,256),mode='bilinear')
+		else:
+			smallbatch = batch
 		# get xs of the points with CNN
-		ys = F.relu(self.c1(batch))
+		ys = F.relu(self.c1(smallbatch))
 		ys = self.b2(F.relu(self.c2(ys)))
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
@@ -156,12 +162,33 @@ class NeuralSpline(nn.Module):
 		for nexp in range(self.nexperts):
 			# init output vars
 			cur_out = torch.zeros(batch.size()).cuda()
-			cur_splines = torch.zeros(batch.size(0),3,self.xs.size(0))
-			# enhance each image with the expert spline
+			# cur_splines = torch.zeros(batch.size(0),3,self.xs.size(0))
+			# for each image
 			for nimg in range(batch.size(0)):
 				cur_img = batch[nimg,:,:,:]
 				cur_ys = ys[nimg,nexp,:,:]
-				out[nexp][nimg,:,:,:], splines[nexp][nimg,:,:] = self.enhanceImage(cur_img, cur_ys)
+				# enhance the image with the expert spline
+				if self.apply_to=='rgb':
+					out[nexp][nimg,:,:,:], splines[nexp][nimg,:,:] = self.enhanceImage(cur_img, cur_ys)
+				else:
+					# squeeze lab range to use spline in the range [0,1]
+					l,a,b = cur_img[0,:,:], cur_img[1,:,:], cur_img[2,:,:]
+					l,a,b = l.clone(), a.clone(), b.clone()
+					l = l / 100.
+					a = (a+110.)/220.
+					b = (b+110.)/220.
+					cur_img = torch.stack((l,a,b),0)
+					# calculate and apply spline
+					cur_out, cur_spline = self.enhanceImage(cur_img, cur_ys)
+					# expand back to lab range
+					cur_out[0,:,:] = cur_out[0,:,:].clone() * 100.
+					cur_out[1,:,:] = (cur_out[1,:,:].clone()*220.)-110.
+					cur_out[2,:,:] = (cur_out[2,:,:].clone()*220.)-110.
+					out[nexp][nimg,:,:,:] = cur_out
+					splines[nexp][nimg,:,:] = cur_spline
+			# convert back if in test
+			if not self.training and self.apply_to=='lab':
+				out[nexp] = self.lab2rgb(out[nexp])
 		return out, splines
 
 
