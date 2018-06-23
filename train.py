@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 from test import test
 import customTransforms
+import ptcolor
 
 class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
@@ -62,7 +63,7 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, apply_to='rgb', \
-		  downsample_strategy='avgpool', lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
+		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
 		# define summary writer
 		expname = 'spline_{}_npoints_{:d}_nfilters_{:d}'.format(apply_to,npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
@@ -130,7 +131,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# calculate loss
 				losses, loss = [], 0
 				for i in range(len(out_lab)):
-					cur_loss = F.mse_loss(out_lab[i], gt_lab[i])
+					if deltae == 94:
+						cur_loss = ptcolor.deltaE94(out_lab[i], gt_lab[i])
+					else:
+						cur_loss = ptcolor.deltaE(out_lab[i], gt_lab[i])
+					cur_loss = cur_loss.mean()
 					losses.append(cur_loss)
 					writer.add_scalar('train_loss_{}'.format(experts_names[i]), cur_loss.data.cpu().mean(), curr_iter)
 					loss += cur_loss

@@ -7,7 +7,7 @@ from NeuralSpline import NeuralSpline
 
 
 # parse args
-parser = argparse.ArgumentParser(description='Neural Spline.')
+parser = argparse.ArgumentParser(description='Neural Spline.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument("-i", "--input_dir", help="The input dir containing the raw images.",
 							   default="/media/flavio/Volume/datasets/fivek/raw/")
@@ -23,6 +23,7 @@ parser.add_argument("-lr", "--lr",            help="Learning rate.",            
 parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
 
 parser.add_argument("-cs", "--colorspace",  help="Colorspace to which is applied the spline.", type=str, default='rgb')
+parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94)
 
 parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
 													[maxpool, avgpool, convs]",     type=str, default='avgpool')
@@ -48,7 +49,7 @@ if not len(args.test)==3: btest = False
 if btrain:
 	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, \
 		args.npoints, args.nfilters, apply_to=args.colorspace, downsample_strategy=args.downsample_strategy, \
-		lr=args.lr, weight_decay=args.weight_decay, exp_name=args.expname) #, weights_from=weights_from)
+		deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, exp_name=args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
