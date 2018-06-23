@@ -26,7 +26,7 @@ parser.add_argument("-cs", "--colorspace",  help="Colorspace to which is applied
 parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94)
 
 parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
-													[maxpool, avgpool, convs]",     type=str, default='avgpool')
+													[maxpool, avgpool, convs, proj]",  type=str, default='avgpool')
 
 parser.add_argument("-tr", "--train", help="Train. Lunch with args <train_txt> <val_txt>",
 					nargs='+', default=["/media/flavio/Volume/datasets/fivek/train_mit.txt", \
@@ -59,6 +59,6 @@ if btest:
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])
 	# calculate
-	l2_lab, l2_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, spline, outdir=args.test[2])
-	for i in range(len(l2_lab)):
-		print('{:d}: L2LAB = {:.4f} - L2L = {:.4f}'.format(i,l2_lab[i],l2_l[i]))
+	de, l1_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, spline, args.deltae, outdir=args.test[2])
+	for i in range(len(de)):
+		print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))

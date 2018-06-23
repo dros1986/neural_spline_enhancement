@@ -47,7 +47,7 @@ class NeuralSpline(nn.Module):
 			self.downsample = nn.AvgPool2d(7, stride=1)
 			self.l1 = nn.Linear(16*nc, 16*nc)
 			self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
-		else:
+		elif downsample_strategy=='convs':
 			self.downsample = nn.Sequential(
 				nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0),
 				nn.BatchNorm2d(32*nc, momentum=momentum),
@@ -58,6 +58,14 @@ class NeuralSpline(nn.Module):
 			)
 			self.l1 = nn.Linear(64*nc, 32*nc)
 			self.l2 = nn.Linear(32*nc, 3*n*self.nexperts)
+		else:
+			self.downsample = nn.Sequential(
+				nn.Conv2d(16*nc, 16*nc, kernel_size=1, stride=1, padding=0),
+				nn.Conv2d(16*nc, 3*n, kernel_size=1, stride=1, padding=0),
+				nn.AvgPool2d(7, stride=1)
+			)
+			self.l1 = lambda x: x
+			self.l2 = lambda x: x
 
 	def rgb2lab(self, x):
 		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)

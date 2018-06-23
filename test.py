@@ -12,10 +12,11 @@ from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+import ptcolor
 
 
 
-def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
+def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, outdir=''):
 		spline.eval()
 		# create folder
 		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
@@ -35,7 +36,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 				drop_last = False
 		)
 		# create output mat
-		diff_lab,diff_l,nimages = [0 for i in range(len(dExpert))],[0 for i in range(len(dExpert))],0
+		de,diff_l,nimages = [0 for i in range(len(dExpert))],[0 for i in range(len(dExpert))],0
 		# calculate differences
 		for bn, (images,fns) in enumerate(test_data_loader):
 			raw = images[0]
@@ -56,13 +57,15 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 				out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 				# convert to LAB
 				out_lab, gt_lab = spline.rgb2lab(out_rgb[i].cuda()), spline.rgb2lab(experts[i].cuda())
-				# calculate diff # sqrt(sum_c((out_chw-gt_chw)^2))
-				cur_diff = torch.pow((out_lab-gt_lab),2)         # 10 3 256 256
-				cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # 10 256 256
-				cur_diff_l = torch.sqrt(cur_diff[:,0,:,:])       # 10 256 256
-				# sum all
-				diff_lab[i] += cur_diff_lab.sum()
-				diff_l[i] += cur_diff_l.sum()
+				# calculate deltaE
+				if deltae == 94:
+					cur_de = ptcolor.deltaE94(out_lab, gt_lab)
+				else:
+					cur_de = ptcolor.deltaE(out_lab, gt_lab)
+				# add current deltaE to accumulator
+				de[i] += cur_de.sum() #.mean()
+				# calculate L1 on L channel and add to
+				diff_l[i] += torch.abs(out_lab[:,0,:,:]-gt_lab[:,0,:,:]).sum() #.mean()
 				# save if required
 				if outdir:
 					# save each image
@@ -73,8 +76,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 						cur_img = Image.fromarray(cur_img)
 						cur_img.save(os.path.join(outdir,experts_names[i],cur_fn))
 		# calculate differences
-		for i in range(len(diff_lab)):
-			diff_lab[i] /= nimages*h*w
+		for i in range(len(de)):
+			de[i] /= nimages*h*w
 			diff_l[i] /= nimages*h*w
 
-		return diff_lab, diff_l
+		return de, diff_l

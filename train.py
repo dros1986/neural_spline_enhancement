@@ -104,7 +104,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			optimizer.load_state_dict(state['optimizer'])
 			start_epoch = state['nepoch']
 		# for each batch
-		curr_iter,best_l2_lab = 0,0
+		curr_iter,best_de = 0,0
 		for nepoch in range(start_epoch, epochs):
 			for bn, images in enumerate(train_data_loader):
 				spline.train()
@@ -179,21 +179,21 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update iter num
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
-			l2_lab, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
-			for i in range(len(l2_lab)):
+			de, l1_l = test(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, outdir='')
+			for i in range(len(de)):
 				cur_exp_name = experts_names[i]
-				writer.add_scalar('L2-LAB_'+cur_exp_name, l2_lab[i], curr_iter)
-				writer.add_scalar('L2-L_'+cur_exp_name, l2_l[i], curr_iter)
+				writer.add_scalar('L2-dE{:d}_'.format(deltae)+cur_exp_name, de[i], curr_iter)
+				writer.add_scalar('L1-L_'+cur_exp_name, l1_l[i], curr_iter)
 			# save best model
 			testid = 2 if len(experts_names)>=4 else 0
-			if nepoch == 0 or (nepoch>0 and l2_lab[testid]<best_l2_lab):
-				best_l2_lab = l2_lab[testid]
+			if nepoch == 0 or (nepoch>0 and de[testid]<best_de):
+				best_de = de[testid]
 				torch.save({
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-					'l2_lab' : l2_lab[testid],
+					'dE{:d}'.format(deltae) : de[testid],
 				}, './models/{}_best.pth'.format(expname))
 			# print
-			print('{}CURR:{} L2_LAB = {}{:.4f}{} - L2_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, cols.GREEN, l2_lab[testid], cols.LIGHT_GRAY, cols.GREEN, l2_l[testid], cols.ENDC))
-			print('{}BEST:{} L2_LAB = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, cols.GREEN, best_l2_lab, cols.ENDC))
+			print('{}CURR:{} dE{:d} = {}{:.4f}{} - L1_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, deltae, cols.GREEN, de[testid], cols.LIGHT_GRAY, cols.GREEN, l1_l[testid], cols.ENDC))
+			print('{}BEST:{} dE{:d} = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, deltae, cols.GREEN, best_de, cols.ENDC))
