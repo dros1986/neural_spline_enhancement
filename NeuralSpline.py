@@ -15,7 +15,7 @@ import ptcolor
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc, nexperts, apply_to='rgb', downsample_strategy='avgpool'):
+	def __init__(self, n, nc, nexperts, apply_to='rgb', downsample_strategy='avgpool', n_input_channels=3):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
@@ -29,7 +29,7 @@ class NeuralSpline(nn.Module):
 		# compute interpolation matrix (will be stored in self.matrix)
 		self._precalc()
 		# define net layers
-		self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+		self.c1 = nn.Conv2d(n_input_channels, nc, kernel_size=3, stride=2, padding=0)
 		self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
 		self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
 		self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
@@ -132,7 +132,7 @@ class NeuralSpline(nn.Module):
 		image = input_image.clone()
 		splines = torch.zeros(3,self.xs.size(0))
 		# for each channel of the image, define spline and apply it
-		for ch in range(image.size(0)):
+		for ch in range(min(3,image.size(0))):
 			cur_ch = image[ch,:,:].clone()
 			cur_ys = ys[ch,:].clone()
 			# calculate spline upon identity + found ys

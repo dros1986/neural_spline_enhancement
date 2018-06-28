@@ -24,9 +24,15 @@ class cols:
 
 def showImage(writer, batch, name, n_iter):
 	# batch2image
-	img = utils.make_grid(batch, nrow=int(math.sqrt(batch.size(0))), padding=3)
+	img = utils.make_grid(batch[:,:3,:,:], nrow=int(math.sqrt(batch.size(0))), padding=3)
 	img = torch.clamp(img,0,1)
 	writer.add_image(name, img, n_iter)
+	# visualize first image maps if any
+	if batch.size(1)>3:
+		img = batch[0,3:,:,:].unsqueeze(1)
+		img = utils.make_grid(img, nrow=int(math.sqrt(batch.size(0))), padding=3)
+		img = torch.clamp(img,0,1)
+	 	writer.add_image(name+'_maps', img, n_iter)
 
 def plotSplines(writer, splines, name, n_iter):
 	# get range
@@ -63,7 +69,8 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, apply_to='rgb', \
-		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, exp_name='', weights_from=''):
+		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', \
+		  nclasses=150, exp_name='', weights_from=''):
 		# define summary writer
 		expname = 'spline_{}_npoints_{:d}_nfilters_{:d}'.format(apply_to,npoints,nc)
 		if exp_name: expname += '_{}'.format(exp_name)
@@ -79,13 +86,13 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			experts_names.append([s for s in dExpert[i].split(os.sep) if s][-1])
 		# define transform
 		trans = customTransforms.Compose([
-					customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
-					customTransforms.RandomHorizontalFlip(), \
+					# customTransforms.RandomResizedCrop(size=256, scale=(1,1.2),ratio=(0.9,1.1)), \
+					# customTransforms.RandomHorizontalFlip(), \
 					customTransforms.ToTensor(), \
 				])
 		# create dataloader
 		train_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, train_list, trans=trans, include_filenames=False),
+				Dataset(dRaw, dExpert, train_list, dSemSeg, dSaliency, nclasses=nclasses, trans=trans, include_filenames=False),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),
@@ -93,7 +100,10 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				drop_last = False
 		)
 		# create neural spline
-		spline = NeuralSpline(npoints,nc,nexperts,apply_to=apply_to,downsample_strategy=downsample_strategy).cuda()
+		nch = 3
+		if os.path.isdir(dSemSeg): nch += nclasses
+		if os.path.isdir(dSaliency): nch += 1
+		spline = NeuralSpline(npoints,nc,nexperts,apply_to=apply_to,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
@@ -155,7 +165,10 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						plotSplines(writer, splines[i], 'splines_'+experts_names[i], curr_iter)
 					# add histograms
 					for name, param in spline.named_parameters():
-						writer.add_histogram(name, param.detach().cpu().numpy(), curr_iter)
+						try:
+							writer.add_histogram(name, param.detach().cpu().numpy(), curr_iter)
+						except:
+							pass
 				if bn % 100 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),
@@ -179,7 +192,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update iter num
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
-			de, l1_l = test(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, outdir='')
+			de, l1_l = test(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, dSemSeg=dSemSeg, \
+															dSaliency=dSaliency, nclasses=150, outdir='')
 			for i in range(len(de)):
 				cur_exp_name = experts_names[i]
 				writer.add_scalar('L2-dE{:d}_'.format(deltae)+cur_exp_name, de[i], curr_iter)

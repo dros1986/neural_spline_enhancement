@@ -13,6 +13,10 @@ parser.add_argument("-i", "--input_dir", help="The input dir containing the raw 
 							   default="/media/flavio/Volume/datasets/fivek/raw/")
 parser.add_argument("-e", "--experts_dir", help="The experts dirs containing the gt. Can be more then one.",
 					nargs='+', default=["/media/flavio/Volume/datasets/fivek/ExpertC/"])
+parser.add_argument("-sem", "--semseg_dir", help="Folder containing semantic segmentation. \
+											If empty, model does not use semantic segmentation", default="")
+parser.add_argument("-sal", "--saliency_dir", help="Folder containing semantic segmentation. \
+											If empty, model does not use semantic segmentation", default="")
 
 parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
 parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
@@ -27,6 +31,8 @@ parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].", 
 
 parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling. Accepted values are: \
 													[maxpool, avgpool, convs, proj]",  type=str, default='avgpool')
+
+parser.add_argument("-nc", "--nclasses",  help="Number of classes of sem. seg.",       type=int, default=150)
 
 parser.add_argument("-tr", "--train", help="Train. Lunch with args <train_txt> <val_txt>",
 					nargs='+', default=["/media/flavio/Volume/datasets/fivek/train_mit.txt", \
@@ -49,16 +55,22 @@ if not len(args.test)==3: btest = False
 if btrain:
 	train(args.input_dir, args.experts_dir, args.train[0], args.train[1], args.batchsize, args.nepochs, \
 		args.npoints, args.nfilters, apply_to=args.colorspace, downsample_strategy=args.downsample_strategy, \
-		deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, exp_name=args.expname) #, weights_from=weights_from)
+		deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, dSemSeg=args.semseg_dir, \
+		dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)
 
 # test
 if btest:
 	# create net
-	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),apply_to=args.colorspace,downsample_strategy=args.downsample_strategy).cuda()
+	nch = 3
+	if os.path.isdir(args.semseg_dir): nch += args.nclasses
+	if os.path.isdir(args.saliency_dir): nch += 1
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),apply_to=args.colorspace,downsample_strategy=args.downsample_strategy, n_input_channels=nch).cuda()
 	# load weights from net
 	state = torch.load(args.test[1])
 	spline.load_state_dict(state['state_dict'])
 	# calculate
-	de, l1_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, spline, args.deltae, outdir=args.test[2])
+	de, l1_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, \
+					spline, args.deltae, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, \
+					nclasses=args.nclasses, outdir=args.test[2])
 	for i in range(len(de)):
 		print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))

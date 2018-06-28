@@ -16,7 +16,8 @@ import ptcolor
 
 
 
-def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, outdir=''):
+def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dSaliency='', \
+		nclasses=150, outdir=''):
 		spline.eval()
 		# create folder
 		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
@@ -28,7 +29,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, outdir=''):
 				os.makedirs(os.path.join(outdir,experts_names[-1]))
 		# create dataloader
 		test_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, test_list, include_filenames=True),
+				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),
