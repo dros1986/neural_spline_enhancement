@@ -130,7 +130,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# calculate loss
 				losses, loss = [], 0
 				for i in range(len(out_lab)):
-					cur_loss = torch.mean(ptcolor.squared_deltaE94(gt_lab[i], out_lab[i]))
+					# cur_loss = torch.mean(ptcolor.squared_deltaE94(gt_lab[i], out_lab[i]))
+					cur_loss = torch.mean(ptcolor.squared_deltaE(gt_lab[i], out_lab[i]))
 					# cur_loss = F.mse_loss(out_lab[i], gt_lab[i])
 					if cur_loss > 50 and nepoch > 1:
 					        torch.save({"out": out[i], "experts": experts[i], "lss": cur_loss, "epoch": nepoch}, "err.pth")
