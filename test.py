@@ -16,7 +16,7 @@ import ptcolor
 
 
 
-def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dSaliency='', \
+def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb', dSemSeg='', dSaliency='', \
 		nclasses=150, outdir=''):
 		spline.eval()
 		# create folder
@@ -54,10 +54,13 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 			# calculate diff
 			for i in range(len(out_rgb)):
 				out_rgb[i] = out_rgb[i].cpu().data
-				# set bounds
-				out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 				# convert to LAB
-				out_lab, gt_lab = spline.rgb2lab(out_rgb[i].cuda()), spline.rgb2lab(experts[i].cuda())
+				gt_lab = spline.rgb2lab(experts[i].cuda())
+				if apply_to=='rgb':
+					out_rgb[i] = torch.clamp(out_rgb[i],0,1)
+					out_lab = spline.rgb2lab(out_rgb[i].cuda())
+				else:
+					out_lab = out_rgb
 				# calculate deltaE
 				if deltae == 94:
 					cur_de = ptcolor.deltaE94(out_lab, gt_lab)
@@ -69,6 +72,11 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				diff_l[i] += torch.abs(out_lab[:,0,:,:]-gt_lab[:,0,:,:]).sum() #.mean()
 				# save if required
 				if outdir:
+					# convert if required
+					if not apply_to=='rgb':
+						for j in range(out_rgb[i].size(0)):
+							out_rgb[i] = spline.lab2rgb(out_rgb[i])
+							out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 					# save each image
 					for j in range(out_rgb[i].size(0)):
 						cur_fn = fns[j]

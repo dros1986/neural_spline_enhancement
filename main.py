@@ -70,7 +70,7 @@ if btest:
 	spline.load_state_dict(state['state_dict'])
 	# calculate
 	de, l1_l = test(args.input_dir, args.experts_dir, args.test[0], args.batchsize, \
-					spline, args.deltae, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, \
-					nclasses=args.nclasses, outdir=args.test[2])
+					spline, args.deltae, apply_to=args.colorspace, dSemSeg=args.semseg_dir, \
+					dSaliency=args.saliency_dir, nclasses=args.nclasses, outdir=args.test[2])
 	for i in range(len(de)):
 		print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))
