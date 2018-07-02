@@ -16,7 +16,7 @@ import ptcolor
 
 
 
-def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb', dSemSeg='', dSaliency='', \
+def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dSaliency='', \
 		nclasses=150, outdir=''):
 		spline.eval()
 		# create folder
@@ -32,8 +32,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb'
 				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
 				batch_size = batch_size,
 				shuffle = True,
-				num_workers = cpu_count(),
-				# num_workers = 0,
+				# num_workers = cpu_count(),
+				num_workers = 0,
 				drop_last = False
 		)
 		# create output mat
@@ -45,42 +45,32 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb'
 			nimages += experts[0].size(0)
 			# to GPU
 			raw = raw.cuda()
-			# for i in range(len(experts)):
-			# 	experts[i] = Variable(experts[i].cuda(), requires_grad=False)
-			# apply spline transform
-			out_rgb, splines = spline(raw)
+			# compute transform
+			out, splines = spline(raw)
+			# detach all
+			out = [e.detach() for e in out]
 			# get size of images
-			h,w = out_rgb[i].size(2),out_rgb[i].size(3)
-			# calculate diff
-			for i in range(len(out_rgb)):
-				out_rgb[i] = out_rgb[i].cpu().data
-				# convert to LAB
+			h,w = out[i].size(2),out[i].size(3)
+			# for each expert
+			for i in range(len(out)):
+				# convert gt and output in lab (remember that spline in test/lab converts back in rgb)
 				gt_lab = spline.rgb2lab(experts[i].cuda())
-				if apply_to=='rgb':
-					out_rgb[i] = torch.clamp(out_rgb[i],0,1)
-					out_lab = spline.rgb2lab(out_rgb[i].cuda())
-				else:
-					out_lab = out_rgb[i]
+				ot_lab = spline.rgb2lab(out[i].cuda())
 				# calculate deltaE
 				if deltae == 94:
-					cur_de = ptcolor.deltaE94(out_lab, gt_lab)
+					cur_de = ptcolor.deltaE94(ot_lab, gt_lab)
 				else:
-					cur_de = ptcolor.deltaE(out_lab, gt_lab)
+					cur_de = ptcolor.deltaE(ot_lab, gt_lab)
 				# add current deltaE to accumulator
-				de[i] += cur_de.sum() #.mean()
+				de[i] += cur_de.sum()
 				# calculate L1 on L channel and add to
-				diff_l[i] += torch.abs(out_lab[:,0,:,:]-gt_lab[:,0,:,:]).sum() #.mean()
+				diff_l[i] += torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:]).sum()
 				# save if required
 				if outdir:
-					# convert if required
-					if not apply_to=='rgb':
-						for j in range(out_rgb[i].size(0)):
-							out_rgb[i] = spline.lab2rgb(out_rgb[i])
-							out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 					# save each image
-					for j in range(out_rgb[i].size(0)):
+					for j in range(out[i].size(0)):
 						cur_fn = fns[j]
-						cur_img = out_rgb[i][j,:,:,:].cpu().numpy().transpose((1,2,0))
+						cur_img = out[i][j,:,:,:].cpu().numpy().transpose((1,2,0))
 						cur_img = (cur_img*255).astype(np.uint8)
 						cur_img = Image.fromarray(cur_img)
 						cur_img.save(os.path.join(outdir,experts_names[i],cur_fn))
@@ -88,5 +78,5 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb'
 		for i in range(len(de)):
 			de[i] /= nimages*h*w
 			diff_l[i] /= nimages*h*w
-
+		# return values
 		return de, diff_l
