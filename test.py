@@ -60,7 +60,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, apply_to='rgb'
 					out_rgb[i] = torch.clamp(out_rgb[i],0,1)
 					out_lab = spline.rgb2lab(out_rgb[i].cuda())
 				else:
-					out_lab = out_rgb
+					out_lab = out_rgb[i]
 				# calculate deltaE
 				if deltae == 94:
 					cur_de = ptcolor.deltaE94(out_lab, gt_lab)
