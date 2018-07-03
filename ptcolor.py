@@ -1,3 +1,4 @@
+
 """Pytorch routines for color conversions and management.
 
 All color arguments are given as 4-dimensional tensors representing batch of images (Bx3xHxW).
@@ -47,14 +48,27 @@ def _mul(coeffs, image):
     # return torch.einsum("dc,bcij->bdij", (coeffs.to(image.device), image))
 
 
-_SRGB_TO_XYZ = _t([[0.4124564, 0.3575761, 0.1804375],
-                   [0.2126729, 0.7151522, 0.0721750],
-                   [0.0193339, 0.1191920, 0.9503041]])
+_RGB_TO_XYZ = {
+    "srgb": _t([[0.4124564, 0.3575761, 0.1804375],
+                [0.2126729, 0.7151522, 0.0721750],
+                [0.0193339, 0.1191920, 0.9503041]]),
+
+    "prophoto": _t([[0.7976749, 0.1351917, 0.0313534],
+                    [0.2880402, 0.7118741, 0.0000857],
+                    [0.0000000, 0.0000000, 0.8252100]])
+
+    }
 
 
-_XYZ_TO_SRGB = _t([[3.2404542, -1.5371385, -0.4985314],
+_XYZ_TO_RGB = {
+    "srgb": _t([[3.2404542, -1.5371385, -0.4985314],
                    [-0.9692660, 1.8760108, 0.0415560],
-                   [0.0556434, -0.2040259, 1.0572252]])
+                   [0.0556434, -0.2040259, 1.0572252]]),
+
+    "prophoto": _t([[ 1.3459433, -0.2556075, -0.0511118],
+                    [-0.5445989,  1.5081673,  0.0205351],
+                    [0.0000000,  0.0000000,  1.2118128]])
+    }
 
 
 WHITE_POINTS = {item[0]: _t(item[1:]).view(1, 3, 1, 1) for item in [
@@ -75,30 +89,52 @@ _LAB_TO_XYZ = _t([[1.0 / 116.0, 1.0 / 500.0, 0], [1.0 / 116.0, 0, 0], [1.0 / 116
 _LAB_OFF = _t([16.0, 0.0, 0.0]).view(1, 3, 1, 1)
 
 
-def apply_srgb_gamma(rgb):
-    """Linear to gamma srgb.
+def apply_gamma(rgb, gamma="srgb"):
+    """Linear to gamma rgb.
 
-    Assume that srgb values are in the [0, 1] range (but values outside are tolerated).
+    Assume that rgb values are in the [0, 1] range (but values outside are tolerated).
+
+    gamma can be "srgb", a real-valued exponent, or None.
+
+    >>> apply_gamma(torch.tensor([0.5, 0.4, 0.1]).view([1, 3, 1, 1]), 0.5).view(-1)
+    tensor([ 0.2500, 0.1600, 0.0100])
+
     """
-    T = 0.0031308
-    rgb1 = torch.max(rgb, rgb.new_tensor(T))
-    return torch.where(rgb < T, 12.92 * rgb, (1.055 * torch.pow(torch.abs(rgb1), 1 / 2.4) - 0.055))
+    if gamma == "srgb":
+        T = 0.0031308
+        rgb1 = torch.max(rgb, rgb.new_tensor(T))
+        return torch.where(rgb < T, 12.92 * rgb, (1.055 * torch.pow(torch.abs(rgb1), 1 / 2.4) - 0.055))
+    elif gamma is None:
+        return rgb
+    else:
+        return torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), 1.0 / gamma)
 
 
-def remove_srgb_gamma(rgb):
-    """Gamma to linear srgb.
 
-    Assume that srgb values are in the [0, 1] range (but values outside are tolerated).
+def remove_gamma(rgb, gamma="srgb"):
+    """Gamma to linear rgb.
 
-    >>> remove_srgb_gamma(apply_srgb_gamma(torch.tensor([0.001, 0.3, 0.4])))
+    Assume that rgb values are in the [0, 1] range (but values outside are tolerated).
+
+    gamma can be "srgb", a real-valued exponent, or None.
+
+    >>> remove_gamma(apply_gamma(torch.tensor([0.001, 0.3, 0.4])))
     tensor([ 0.0010,  0.3000,  0.4000])
+
+    >>> remove_gamma(torch.tensor([0.5, 0.4, 0.1]).view([1, 3, 1, 1]), 2.0).view(-1)
+    tensor([ 0.2500, 0.1600, 0.0100])
     """
-    T = 0.04045
-    rgb1 = torch.max(rgb, rgb.new_tensor(T))
-    return torch.where(rgb < T, rgb / 12.92, torch.pow(torch.abs(rgb1 + 0.055) / 1.055, 2.4))
+    if gamma == "srgb":
+        T = 0.04045
+        rgb1 = torch.max(rgb, rgb.new_tensor(T))
+        return torch.where(rgb < T, rgb / 12.92, torch.pow(torch.abs(rgb1 + 0.055) / 1.055, 2.4))
+    elif gamma is None:
+        return rgb
+    else:
+        return torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), gamma)
 
 
-def rgb2xyz(rgb, gamma_correction=True, clip_rgb=False):
+def rgb2xyz(rgb, gamma_correction="srgb", clip_rgb=False, space="srgb"):
     """sRGB to XYZ conversion.
 
     rgb:  Bx3xHxW
@@ -110,7 +146,7 @@ def rgb2xyz(rgb, gamma_correction=True, clip_rgb=False):
     >>> rgb2xyz(torch.tensor([0., 0.75, 0.]).view(1, 3, 1, 1)).view(-1)
     tensor([ 0.1868,  0.3737,  0.0623])
 
-    >>> rgb2xyz(torch.tensor([0.4, 0.8, 0.2]).view(1, 3, 1, 1), gamma_correction=False).view(-1)
+    >>> rgb2xyz(torch.tensor([0.4, 0.8, 0.2]).view(1, 3, 1, 1), gamma_correction=None).view(-1)
     tensor([ 0.4871,  0.6716,  0.2931])
 
     >>> rgb2xyz(torch.ones(2, 3, 4, 5)).size()
@@ -119,15 +155,17 @@ def rgb2xyz(rgb, gamma_correction=True, clip_rgb=False):
     >>> xyz2rgb(torch.tensor([-1, 2., 0.]).view(1, 3, 1, 1), clip_rgb=True).view(-1)
     tensor([ 0.0000,  1.0000,  0.0000])
 
+    >>> rgb2xyz(torch.tensor([0.4, 0.8, 0.2]).view(1, 3, 1, 1), gamma_correction=None, space='prophoto').view(-1)
+    tensor([ 0.4335,  0.6847,  0.1650])
+
     """
     if clip_rgb:
         rgb = torch.clamp(rgb, 0, 1)
-    if gamma_correction:
-        rgb = remove_srgb_gamma(rgb)
-    return _mul(_SRGB_TO_XYZ, rgb)
+    rgb = remove_gamma(rgb, gamma_correction)
+    return _mul(_RGB_TO_XYZ[space], rgb)
 
 
-def xyz2rgb(xyz, gamma_correction=True, clip_rgb=False):
+def xyz2rgb(xyz, gamma_correction="srgb", clip_rgb=False, space="srgb"):
     """XYZ to sRGB conversion.
 
     rgb:  Bx3xHxW
@@ -146,11 +184,10 @@ def xyz2rgb(xyz, gamma_correction=True, clip_rgb=False):
     tensor([ 0.0000,  1.0000,  0.0000])
 
     """
-    rgb = _mul(_XYZ_TO_SRGB, xyz)
+    rgb = _mul(_XYZ_TO_RGB[space], xyz)
     if clip_rgb:
         rgb = torch.clamp(rgb, 0, 1)
-    if gamma_correction:
-        rgb = apply_srgb_gamma(rgb)
+    rgb = apply_gamma(rgb, gamma_correction)
     return rgb
 
 
@@ -206,15 +243,15 @@ def lab2xyz(lab, white_point="d65"):
     return xyz * WHITE_POINTS[white_point].to(lab.device)
 
 
-def rgb2lab(rgb, white_point="d65", gamma_correction=True, clip_rgb=False):
+def rgb2lab(rgb, white_point="d65", gamma_correction="srgb", clip_rgb=False, space="srgb"):
     """sRGB to Lab conversion."""
-    lab = xyz2lab(rgb2xyz(rgb, gamma_correction, clip_rgb), white_point)
+    lab = xyz2lab(rgb2xyz(rgb, gamma_correction, clip_rgb, space), white_point)
     return lab
 
 
-def lab2rgb(rgb, white_point="d65", gamma_correction=True, clip_rgb=False):
+def lab2rgb(rgb, white_point="d65", gamma_correction="srgb", clip_rgb=False, space="srgb"):
     """Lab to sRGB conversion."""
-    return xyz2rgb(lab2xyz(rgb, white_point), gamma_correction, clip_rgb)
+    return xyz2rgb(lab2xyz(rgb, white_point), gamma_correction, clip_rgb, space)
 
 
 def squared_deltaE(lab1, lab2):
@@ -298,20 +335,24 @@ def deltaE94(lab1, lab2):
     return torch.sqrt(squared_deltaE94(lab1, lab2))
 
 
-def _check_conversion():
+def _check_conversion(**opts):
     """Verify the conversions on the RGB cube.
 
-    >>> _check_conversion()
+    >>> _check_conversion(white_point='d65', gamma_correction='srgb', clip_rgb=False, space='srgb')
     True
+
+    >>> _check_conversion(white_point='d50', gamma_correction=1.8, clip_rgb=False, space='prophoto')
+    True
+
     """
     for r in range(0, 256, 15):
         for g in range(0, 256, 15):
             for b in range(0, 256, 15):
                 rgb = torch.tensor([r / 255.0, g / 255.0, b / 255.0]).view(1, 3, 1, 1)
-                lab = rgb2lab(rgb)
-                rgb2 = lab2rgb(lab)
+                lab = rgb2lab(rgb, **opts)
+                rgb2 = lab2rgb(lab, **opts)
                 de = deltaE(rgb, rgb2).item()
-                if de > 1e-4:
+                if de > 2e-4:
                     print("Conversion failed for RGB:", r, g, b, " deltaE", de)
                     return False
     return True
