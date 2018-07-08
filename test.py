@@ -38,6 +38,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 		)
 		# create output mat
 		diff_lab,diff_l,nimages = [0 for i in range(len(dExpert))],[0 for i in range(len(dExpert))],0
+		diff_lab94 = diff_lab[:]
 		# calculate differences
 		for bn, (images,fns) in enumerate(test_data_loader):
 			raw = images[0]
@@ -61,10 +62,12 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 				# calculate diff # sqrt(sum_c((out_chw-gt_chw)^2))
 				cur_diff = torch.pow((out_lab-gt_lab),2)         # 10 3 256 256
 				# cur_diff_lab = torch.sqrt(torch.sum(cur_diff,1)) # 10 256 256
-				cur_diff_lab = ptcolor.deltaE94(gt_lab, out_lab).squeeze(1)  # !!!
+				cur_diff_lab94 = ptcolor.deltaE94(gt_lab, out_lab).squeeze(1)  # !!!
+				cur_diff_lab = ptcolor.deltaE(gt_lab, out_lab).squeeze(1)  # !!!
 				cur_diff_l = torch.sqrt(cur_diff[:,0,:,:])       # 10 256 256
 				# sum all
 				diff_lab[i] += cur_diff_lab.sum()
+				diff_lab94[i] += cur_diff_lab94.sum()
 				diff_l[i] += cur_diff_l.sum()
 				# save if required
 				if outdir:
@@ -78,6 +81,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, outdir=''):
 		# calculate differences
 		for i in range(len(diff_lab)):
 			diff_lab[i] /= nimages*h*w
+			diff_lab94[i] /= nimages*h*w
 			diff_l[i] /= nimages*h*w
 
-		return diff_lab, diff_l
+		return diff_lab, diff_lab94, diff_l

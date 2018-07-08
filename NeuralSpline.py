@@ -33,8 +33,8 @@ class NeuralSplineBase(nn.Module):
         # compute interpolation matrix (will be stored in self.matrix)
         self._precalc()
 
-    def rgb2lab(self,x, from_space='srgb'):
-        return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
+    def rgb2lab(self,x, from_space='ignored'):
+        return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=1.8, space="prophoto", white_point="d50")
 
     def _precalc(self):
         """ Calculate interpolation mat for finding Ms.
@@ -202,6 +202,47 @@ class Baseline(NeuralSplineBase):
         ys = F.dropout(ys, training=self.training)
         ys = self.l2(ys)
         ys = ys.view(ys.size(0),self.nexperts,3,-1)
+        return self._final_proc(batch, ys)
+
+
+class Local(NeuralSplineBase):
+    """Fully convolutional, few 3x3 stride 2, then 1x1 stride 1 then avg pool"""
+    def __init__(self, n, nc, nexperts):
+        super().__init__(n, nc, nexperts)
+        momentum = 0.01
+        # define net layers
+        self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+        # self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
+        self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+        self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+        self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+        self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+        self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+        self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+        self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+        self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        self.c6 = nn.Conv2d(16*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+        self.b6 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        self.c7 = nn.Conv2d(16*nc, 16*nc, kernel_size=1, stride=1, padding=0)
+        self.b7 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        self.c8 = nn.Conv2d(16*nc, 16*nc, kernel_size=1, stride=1, padding=0)
+        self.b8 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        self.c9 = nn.Conv2d(16*nc, 3*n*self.nexperts, kernel_size=1, stride=1, padding=0)
+
+    def forward(self, batch):
+        # get xs of the points with CNN
+        ys = batch
+        ys = F.relu(self.c1(ys))
+        ys = self.b2(F.relu(self.c2(ys)))
+        ys = self.b3(F.relu(self.c3(ys)))
+        ys = self.b4(F.relu(self.c4(ys)))
+        ys = self.b5(F.relu(self.c5(ys)))
+        ys = self.b6(F.relu(self.c6(ys)))
+        ys = self.b7(F.relu(self.c7(ys)))
+        ys = self.b8(F.relu(self.c8(ys)))
+        ys = self.c9(ys)
+        ys = F.adaptive_avg_pool2d(ys, 1)
+        ys = ys.view(ys.size(0), self.nexperts, 3, -1)
         return self._final_proc(batch, ys)
 
 
@@ -375,7 +416,7 @@ if __name__ == "__main__":
     nf = 100
     # spline = NeuralSpline(n, nf, 1)
     # spline = HDRNet(n, nf, 1)
-    spline = WithSemantic(n, nf, 1)
+    spline = Gray(n, nf, 1)
     spline.cuda()
     # img = torch.rand(1,3,256,256)
     # px_vals = unique(img)

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline, HDRNet, Baseline, Resnet50, WithSemantic
+from NeuralSpline import NeuralSpline, HDRNet, Baseline, Resnet50, WithSemantic, Local
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -96,7 +96,6 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# spline = NeuralSpline(npoints,nc,nexperts).cuda()
 		# spline = HDRNet(npoints,nc,nexperts).cuda()
 		spline = Baseline(npoints, nc, nexperts).cuda()
-		# spline = WithSemantic(npoints, nc, nexperts).cuda()
 		# define optimizer
 		parameters = filter(lambda p: p.requires_grad, spline.parameters())
 		optimizer = torch.optim.Adam(parameters, lr=0.001, weight_decay=1e-1)
@@ -180,10 +179,11 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			# at the end of each epoch, test values
 			if nepoch % 10 != 0:
 			        continue
-			l2_lab, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
+			l2_lab, l2_lab94, l2_l = test(dRaw, dExpert, val_list, batch_size, spline, outdir='')
 			for i in range(len(l2_lab)):
 				cur_exp_name = experts_names[i]
-				writer.add_scalar('L2-LAB_'+cur_exp_name, l2_lab[i], curr_iter)
+				writer.add_scalar('DE_'+cur_exp_name, l2_lab[i], curr_iter)
+				writer.add_scalar('DE94_'+cur_exp_name, l2_lab94[i], curr_iter)
 				writer.add_scalar('L2-L_'+cur_exp_name, l2_l[i], curr_iter)
 			# save best model
 			testid = 2 if len(experts_names)>=4 else 0
