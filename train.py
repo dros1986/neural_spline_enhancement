@@ -1,4 +1,4 @@
-import os,sys,math,time,io
+import os,sys,math,time,io,argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -68,9 +68,9 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, apply_to='rgb', \
-		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', \
-		  nclasses=150, exp_name='', weights_from=''):
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, colorspace='srgb', apply_to='rgb', \
+		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', nclasses=150, \
+		  exp_name='', weights_from=''):
 		# define summary writer
 		expname = '{}_npts_{:d}_nf_{:d}'.format(apply_to,npoints,nc)
 		if os.path.isdir(dSemSeg): expname += '_sem'
@@ -105,7 +105,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		nch = 3
 		if os.path.isdir(dSemSeg): nch += nclasses
 		if os.path.isdir(dSaliency): nch += 1
-		spline = NeuralSpline(npoints,nc,nexperts,apply_to=apply_to,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
@@ -213,3 +213,47 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			# print
 			print('{}CURR:{} dE{:d} = {}{:.4f}{} - L1_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, deltae, cols.GREEN, de[testid], cols.LIGHT_GRAY, cols.GREEN, l1_l[testid], cols.ENDC))
 			print('{}BEST:{} dE{:d} = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, deltae, cols.GREEN, best_de, cols.ENDC))
+
+
+if __name__ == '__main__':
+	# parse args
+	parser = argparse.ArgumentParser(description='Neural Spline.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+	# data parameters
+	parser.add_argument("-i", "--input_dir", help="The input dir containing the raw images.",
+								   default="/media/flavio/Volume/datasets/fivek/raw/")
+	parser.add_argument("-e", "--experts_dir", help="The experts dirs containing the gt. Can be more then one.",
+						nargs='+', default=["/media/flavio/Volume/datasets/fivek/ExpertC/"])
+	parser.add_argument("-tl", "--train_list", help="Training list.",
+								   default="/media/flavio/Volume/datasets/fivek/train_mit.txt")
+	parser.add_argument("-vl", "--val_list", help="Validation list.",
+								   default="/media/flavio/Volume/datasets/fivek/test_mit_random250.txt")
+	# spline params
+	parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
+	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
+	parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling.",     type=str, default='avgpool', choices=set(('maxpool','avgpool','convs','proj')))
+	# hyper-params
+	parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
+	parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
+	parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.001)
+	parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
+	# colorspace management
+	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
+	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))
+	# evaluation metric
+	parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
+	# semantic segmentation params
+	parser.add_argument("-sem", "--semseg_dir", help="Folder containing semantic segmentation. \
+												If empty, model does not use semantic segmentation", default="")
+	parser.add_argument("-nc", "--nclasses",  help="Number of classes of sem. seg.",       type=int, default=150)
+	# saliency parameters
+	parser.add_argument("-sal", "--saliency_dir", help="Folder containing semantic segmentation. \
+												If empty, model does not use semantic segmentation", default="")
+	# experiment name
+	parser.add_argument("-en", "--expname", help="Experiment name.", default='')
+	# parse arguments
+	args = parser.parse_args()
+	# start training
+	train(args.input_dir, args.experts_dir, args.train_list, args.val_list, args.batchsize, \
+		args.nepochs, args.npoints, args.nfilters, colorspace=args.colorspace, apply_to=args.apply_to, \
+		downsample_strategy=args.downsample_strategy, deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, \
+		dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)

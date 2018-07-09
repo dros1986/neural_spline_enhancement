@@ -15,14 +15,22 @@ import ptcolor
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc, nexperts, apply_to='rgb', downsample_strategy='avgpool', n_input_channels=3):
+	def __init__(self, n, nc, nexperts, colorspace='srgb', apply_to='rgb', downsample_strategy='avgpool', n_input_channels=3):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
 		self.x0 = 0
 		self.step = 1.0 / (n-1.0)
 		self.nexperts = nexperts
+		self.colorspace = colorspace
 		self.apply_to = apply_to
+		# define white point and gamma correction for conversion to lab
+		if self.colorspace=='srgb':
+			self.white_point = 'd65'
+			self.gamma_correction = 'srgb'
+		else:
+			self.white_point = 'd50'
+			self.gamma_correction = 1.8
 		# define fixed tensors to speed up computation
 		self.xs = torch.arange(0,1,1.0/255.).cuda()
 		momentum = 0.01
@@ -68,10 +76,16 @@ class NeuralSpline(nn.Module):
 			self.l2 = lambda x: x
 
 	def rgb2lab(self, x):
-		return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=True)
+		return ptcolor.rgb2lab(x,	white_point=self.white_point,           \
+									gamma_correction=self.gamma_correction, \
+									clip_rgb=not self.training,				\
+									space=self.colorspace)
 
 	def lab2rgb(self, x):
-		return ptcolor.lab2rgb(x, white_point="d65", gamma_correction=True, clip_rgb=not self.training)
+		return ptcolor.lab2rgb(x, 	white_point=self.white_point,           \
+									gamma_correction=self.gamma_correction, \
+									clip_rgb=not self.training,				\
+									space=self.colorspace)
 
 	def _precalc(self):
 		""" Calculate interpolation mat for finding Ms.
@@ -129,7 +143,7 @@ class NeuralSpline(nn.Module):
 
 
 	def enhanceImage(self, input_image, ys):
-		image = input_image.clone()
+		image = input_image.clone()[:3,:,:]
 		splines = torch.zeros(3,self.xs.size(0))
 		# for each channel of the image, define spline and apply it
 		for ch in range(min(3,image.size(0))):
@@ -164,7 +178,8 @@ class NeuralSpline(nn.Module):
 		ys = self.l2(ys)
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
 		# now we got xs and ys. We need to create the interpolating spline
-		out = [torch.zeros(batch.size()).cuda() for i in range(self.nexperts)]
+		# out = [torch.zeros(batch.size()).cuda() for i in range(self.nexperts)]
+		out = [torch.zeros(batch.size(0),3,batch.size(2),batch.size(3)).cuda() for i in range(self.nexperts)]
 		splines = [torch.zeros(batch.size(0),3,self.xs.size(0)) for i in range(self.nexperts)]
 		# for each expert
 		for nexp in range(self.nexperts):

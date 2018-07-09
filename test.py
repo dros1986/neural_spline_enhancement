@@ -1,4 +1,4 @@
-import os,sys,math,time,io
+import os,sys,math,time,io,argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -32,8 +32,8 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
 				batch_size = batch_size,
 				shuffle = True,
-				# num_workers = cpu_count(),
-				num_workers = 0,
+				num_workers = cpu_count(),
+				# num_workers = 0,
 				drop_last = False
 		)
 		# create output mat
@@ -80,3 +80,55 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 			diff_l[i] /= nimages*h*w
 		# return values
 		return de, diff_l
+
+
+if __name__ == '__main__':
+	# parse args
+	parser = argparse.ArgumentParser(description='Neural Spline.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+	# data parameters
+	parser.add_argument("-i", "--input_dir", help="The input dir containing the raw images.",
+								   default="/media/flavio/Volume/datasets/fivek/raw/")
+	parser.add_argument("-e", "--experts_dir", help="The experts dirs containing the gt. Can be more then one.",
+						nargs='+', default=["/media/flavio/Volume/datasets/fivek/ExpertC/"])
+	parser.add_argument("-l", "--test_list", help="File containing filenames.",
+								   default="/media/flavio/Volume/datasets/fivek/test_mit_random250.txt")
+	# spline params
+	parser.add_argument("-md", "--model", help="pth file containing the state dict of the model.", default="")
+	parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
+	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
+	parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling.",     type=str, default='avgpool', choices=set(('maxpool','avgpool','convs','proj')))
+	# hyper-params
+	parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
+	# colorspace management
+	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
+	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))
+	# evaluation metric
+	parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
+	# semantic segmentation params
+	parser.add_argument("-sem", "--semseg_dir", help="Folder containing semantic segmentation. \
+												If empty, model does not use semantic segmentation", default="")
+	parser.add_argument("-nc", "--nclasses",  help="Number of classes of sem. seg.",       type=int, default=150)
+	# saliency parameters
+	parser.add_argument("-sal", "--saliency_dir", help="Folder containing semantic segmentation. \
+												If empty, model does not use semantic segmentation", default="")
+	# outdir
+	parser.add_argument("-od", "--out_dir", help="Output directory.", default="")
+	# parse arguments
+	args = parser.parse_args()
+	# create net
+	nch = 3
+	if os.path.isdir(args.semseg_dir): nch += args.nclasses
+	if os.path.isdir(args.saliency_dir): nch += 1
+	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),colorspace=args.colorspace, \
+						  apply_to=args.apply_to,downsample_strategy=args.downsample_strategy,  \
+						  n_input_channels=nch).cuda()
+	# load weights from net
+	state = torch.load(args.model)
+	spline.load_state_dict(state['state_dict'])
+	# calculate
+	de, l1_l = test(args.input_dir, args.experts_dir, args.test_list, args.batchsize, \
+					spline, args.deltae, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, \
+					nclasses=args.nclasses, outdir=args.out_dir)
+	# print results for each expert
+	for i in range(len(de)):
+		print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))
