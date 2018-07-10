@@ -2,8 +2,8 @@
 
 # DB=/mnt/data/dataset/fivek
 DB=/mnt/ssd/dataset/fivek
-#GT=/mnt/ssd/dataset/fivek/c
-GT=/mnt/ssd/dataset/fivek/experts_prophoto_8bit/256x256/c
+GT=/mnt/ssd/dataset/fivek/c
+# GT=/mnt/ssd/dataset/fivek/experts_prophoto_8bit/256x256/c
 
 # python3 main.py \
 # 	-i $DB/raw \
@@ -18,7 +18,7 @@ python3 main.py \
 	-e $GT \
 	-bs 50 -np 10 -nf 8 \
 	-tr $DB/train_mit.txt $DB/test_mit_random250.txt \
-	-en baseline-prophoto
+	-en color_transform_srgb
 
 
 # python3 main.py \

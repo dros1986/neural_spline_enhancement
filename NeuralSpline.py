@@ -205,6 +205,82 @@ class Baseline(NeuralSplineBase):
         return self._final_proc(batch, ys)
 
 
+class ColorTransform(NeuralSplineBase):
+    def __init__(self, n, nc, nexperts):
+        super().__init__(n, nc, nexperts)
+        momentum = 0.01
+        # define net layers
+        self.c0 = nn.Conv2d(3, 3, kernel_size=1, stride=1, padding=0)
+        self.c0.weight.data[...] = torch.eye(3)[:, :, None, None]
+        self.c0.bias.data.zero_()
+        self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+        # self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
+        self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+        self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+        self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+        self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+        self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+        self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+        self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+        self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        # self.c6 = nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0)
+        # self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
+        # self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
+        # self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
+        self.l1 = nn.Linear(16*nc, 16*nc)
+        self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
+
+    def forward(self, batch):
+        # get xs of the points with CNN
+        ys = batch
+        batch = self.c0(batch)
+        ys = F.relu(self.c1(ys))
+        ys = self.b2(F.relu(self.c2(ys)))
+        ys = self.b3(F.relu(self.c3(ys)))
+        ys = self.b4(F.relu(self.c4(ys)))
+        ys = self.b5(F.relu(self.c5(ys)))
+        # ys = self.b6(F.relu(self.c6(ys)))
+        # ys = self.b7(F.relu(self.c7(ys)))
+        ys = F.avg_pool2d(ys, ys.size(2))
+        ys = ys.view(ys.size(0),-1)
+        ys = F.dropout(ys, training=self.training)
+        ys = F.relu(self.l1(ys))
+        ys = F.dropout(ys, training=self.training)
+        ys = self.l2(ys)
+        ys = ys.view(ys.size(0),self.nexperts,3,-1)
+        return self._final_proc(batch, ys)
+
+
+class Histogram(NeuralSplineBase):
+    def __init__(self, n, nc, nexperts):
+        super().__init__(n, nc, nexperts)
+        # define net layers
+        self.quant = 128
+        self.l1r = nn.Linear(self.quant, self.quant)
+        self.l1g = nn.Linear(self.quant, self.quant)
+        self.l1b = nn.Linear(self.quant, self.quant)
+        self.l2 = nn.Linear(self.quant, self.quant)
+        self.b2 = nn.BatchNorm1d(self.quant)
+        self.l3 = nn.Linear(self.quant, self.quant)
+        self.b3 = nn.BatchNorm1d(self.quant)
+        self.l4 = nn.Linear(self.quant, 3*n*self.nexperts)
+
+    def forward(self, batch):
+        # get xs of the points with CNN
+        bsz = batch.size(0)
+        data = batch.cpu()
+        h = []
+        for c in (0, 1, 2):
+                hs = [torch.histc(data[b, c, :, :], self.quant, 0, 1) for b in range(bsz)]
+                h.append(torch.stack(hs).to(batch.device))
+        ys = F.relu(self.l1r(h[0]) + self.l1g(h[1]) + self.l1b(h[2]))
+        ys = self.b2(F.relu(self.l2(ys)))
+        ys = self.b3(F.relu(self.l3(ys)))
+        ys = self.l4(ys)
+        ys = ys.view(ys.size(0),self.nexperts,3,-1)
+        return self._final_proc(batch, ys)
+
+
 class Local(NeuralSplineBase):
     """Fully convolutional, few 3x3 stride 2, then 1x1 stride 1 then avg pool"""
     def __init__(self, n, nc, nexperts):
@@ -416,11 +492,12 @@ if __name__ == "__main__":
     nf = 100
     # spline = NeuralSpline(n, nf, 1)
     # spline = HDRNet(n, nf, 1)
-    spline = Gray(n, nf, 1)
+    spline = ColorTransform(n, nf, 1)
     spline.cuda()
-    # img = torch.rand(1,3,256,256)
+    print(spline)
+    # img = torch.rand(1, 3, 256, 256)
     # px_vals = unique(img)
-    img = Variable(torch.rand(5,3,256,256)).cuda()
+    img = Variable(torch.rand(5, 3, 256, 256)).cuda()
     out, splines = spline(img)
     print(out[0].size())
     #import ipdb; ipdb.set_trace()

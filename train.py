@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline, HDRNet, Baseline, Resnet50, WithSemantic, Local
+from NeuralSpline import NeuralSpline, HDRNet, Baseline, Resnet50, WithSemantic, Local, ColorTransform
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -95,7 +95,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		# create neural spline
 		# spline = NeuralSpline(npoints,nc,nexperts).cuda()
 		# spline = HDRNet(npoints,nc,nexperts).cuda()
-		spline = Baseline(npoints, nc, nexperts).cuda()
+		spline = ColorTransform(npoints, nc, nexperts).cuda()
 		# define optimizer
 		parameters = filter(lambda p: p.requires_grad, spline.parameters())
 		optimizer = torch.optim.Adam(parameters, lr=0.001, weight_decay=1e-1)
