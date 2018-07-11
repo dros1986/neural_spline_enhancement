@@ -173,7 +173,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						try:
 							writer.add_histogram(name, param.detach().cpu().numpy(), curr_iter)
 						except:
-							pass
+							print('BOOOM! EXPLODED!!! NaNs in network weights. Problems in gamma correction?')
+							sys.exit(-1)
 				if bn % 100 == 0:
 					torch.save({
 						'state_dict': spline.state_dict(),
