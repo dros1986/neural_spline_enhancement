@@ -72,7 +72,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', nclasses=150, \
 		  exp_name='', weights_from=''):
 		# define summary writer
-		expname = '{}_npts_{:d}_nf_{:d}'.format(apply_to,npoints,nc)
+		expname = '{}_{}_np_{:d}_nf_{:d}_lr_{:.6f}_wd_{:.6f}_{}'.format(apply_to,colorspace,npoints,nc,lr,weight_decay,downsample_strategy)
 		if os.path.isdir(dSemSeg): expname += '_sem'
 		if os.path.isdir(dSaliency): expname += '_sal'
 		if exp_name: expname += '_{}'.format(exp_name)
@@ -125,6 +125,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				#print(bn)
 				start_time = time.time()
 				# reset gradients
+				spline.zero_grad()
 				optimizer.zero_grad()
 				# send to GPU
 				raw = raw.cuda()
@@ -157,6 +158,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				writer.add_scalar('train_loss', loss.cpu().mean(), curr_iter)
 				# backprop
 				loss.backward()
+				# update weights
+				optimizer.step()
 				# update optimizer
 				if bn % (100 if curr_iter < 200 else 200) == 0:
 					showImage(writer, raw, 'train_input', curr_iter)
@@ -177,8 +180,6 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 						'optimizer': optimizer.state_dict(),
 						'nepoch' : nepoch,
 					}, './models/{}.pth'.format(expname))
-				# update weights
-				optimizer.step()
 				# get time
 				elapsed_time = time.time() - start_time
 				# define string
@@ -198,7 +199,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 															dSaliency=dSaliency, nclasses=150, outdir='')
 			for i in range(len(de)):
 				cur_exp_name = experts_names[i]
-				writer.add_scalar('L2-dE{:d}_'.format(deltae)+cur_exp_name, de[i], curr_iter)
+				writer.add_scalar('dE{:d}_'.format(deltae)+cur_exp_name, de[i], curr_iter)
 				writer.add_scalar('L1-L_'+cur_exp_name, l1_l[i], curr_iter)
 			# save best model
 			testid = 2 if len(experts_names)>=4 else 0
@@ -234,7 +235,7 @@ if __name__ == '__main__':
 	# hyper-params
 	parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
 	parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
-	parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.001)
+	parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.0001)
 	parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
 	# colorspace management
 	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
