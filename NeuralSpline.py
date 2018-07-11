@@ -69,7 +69,11 @@ class NeuralSpline(nn.Module):
 		else:
 			self.downsample = nn.Sequential(
 				nn.Conv2d(16*nc, 16*nc, kernel_size=1, stride=1, padding=0),
+				nn.BatchNorm2d(16*nc, momentum=momentum),
+				nn.ReLU(True),
 				nn.Conv2d(16*nc, 3*n, kernel_size=1, stride=1, padding=0),
+				nn.BatchNorm2d(3*n, momentum=momentum),
+				nn.ReLU(True),
 				nn.AvgPool2d(7, stride=1)
 			)
 			self.l1 = lambda x: x
