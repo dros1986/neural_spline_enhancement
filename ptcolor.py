@@ -131,7 +131,9 @@ def remove_gamma(rgb, gamma="srgb"):
     elif gamma is None:
         return rgb
     else:
-        return torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), gamma)
+        res = torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), gamma) + \
+              torch.min(rgb, rgb.new_tensor(0.0)) # very important to avoid vanishing gradients
+        return res
 
 
 def rgb2xyz(rgb, gamma_correction="srgb", clip_rgb=False, space="srgb"):
