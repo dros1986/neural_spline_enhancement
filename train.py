@@ -68,7 +68,7 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 
-def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, colorspace='srgb', apply_to='rgb', \
+def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, colorspace='srgb', apply_to='rgb', abs=False, \
 		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', nclasses=150, \
 		  exp_name='', weights_from=''):
 		# define summary writer
@@ -105,7 +105,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		nch = 3
 		if os.path.isdir(dSemSeg): nch += nclasses
 		if os.path.isdir(dSaliency): nch += 1
-		spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,abs=abs,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
@@ -241,6 +241,7 @@ if __name__ == '__main__':
 	# colorspace management
 	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
 	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))
+	parser.add_argument("-abs","--abs",  		help="Applies absolute value to out rgb.", action='store_true')
 	# evaluation metric
 	parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
 	# semantic segmentation params
@@ -252,10 +253,11 @@ if __name__ == '__main__':
 												If empty, model does not use semantic segmentation", default="")
 	# experiment name
 	parser.add_argument("-en", "--expname", help="Experiment name.", default='')
+
 	# parse arguments
 	args = parser.parse_args()
 	# start training
 	train(args.input_dir, args.experts_dir, args.train_list, args.val_list, args.batchsize, \
-		args.nepochs, args.npoints, args.nfilters, colorspace=args.colorspace, apply_to=args.apply_to, \
+		args.nepochs, args.npoints, args.nfilters, colorspace=args.colorspace, apply_to=args.apply_to, abs=args.abs, \
 		downsample_strategy=args.downsample_strategy, deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, \
 		dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)

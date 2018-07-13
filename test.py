@@ -102,6 +102,7 @@ if __name__ == '__main__':
 	# colorspace management
 	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
 	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))
+	parser.add_argument("-abs","--abs",  		help="Applies absolute value to out rgb.", action='store_true')
 	# evaluation metric
 	parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
 	# semantic segmentation params
@@ -115,12 +116,14 @@ if __name__ == '__main__':
 	parser.add_argument("-od", "--out_dir", help="Output directory.", default="")
 	# parse arguments
 	args = parser.parse_args()
+	# create output folder
+	if not os.path.join(args.out_dir): os.makedirs(args.out_dir)
 	# create net
 	nch = 3
 	if os.path.isdir(args.semseg_dir): nch += args.nclasses
 	if os.path.isdir(args.saliency_dir): nch += 1
 	spline = NeuralSpline(args.npoints,args.nfilters,len(args.experts_dir),colorspace=args.colorspace, \
-						  apply_to=args.apply_to,downsample_strategy=args.downsample_strategy,  \
+						  apply_to=args.apply_to,abs=args.abs,downsample_strategy=args.downsample_strategy,  \
 						  n_input_channels=nch).cuda()
 	# load weights from net
 	state = torch.load(args.model)

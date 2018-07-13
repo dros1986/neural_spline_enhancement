@@ -15,7 +15,7 @@ import ptcolor
 
 
 class NeuralSpline(nn.Module):
-	def __init__(self, n, nc, nexperts, colorspace='srgb', apply_to='rgb', downsample_strategy='avgpool', n_input_channels=3):
+	def __init__(self, n, nc, nexperts, colorspace='srgb', apply_to='rgb', abs=False, downsample_strategy='avgpool', n_input_channels=3):
 		super(NeuralSpline, self).__init__()
 		# define class params
 		self.n = n
@@ -24,6 +24,7 @@ class NeuralSpline(nn.Module):
 		self.nexperts = nexperts
 		self.colorspace = colorspace
 		self.apply_to = apply_to
+		self.abs = abs
 		# define white point and gamma correction for conversion to lab
 		if self.colorspace=='srgb':
 			self.white_point = 'd65'
@@ -221,6 +222,9 @@ class NeuralSpline(nn.Module):
 					cur_out[2,:,:] = (cur_out[2,:,:].clone()*220.)-110.
 					out[nexp][nimg,:,:,:] = cur_out
 					splines[nexp][nimg,:,:] = cur_spline
+			# if required, apply abs
+			if self.abs:
+				out[nexp] = torch.abs(out[nexp])
 			# convert back if in test
 			if not self.training and self.apply_to=='lab':
 				out[nexp] = self.lab2rgb(out[nexp])
