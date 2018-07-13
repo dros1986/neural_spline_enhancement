@@ -15,9 +15,29 @@ from PIL import Image
 import ptcolor
 
 
+def drawSpline(cur_spline, my_dpi=100):
+	# define range
+	r = torch.arange(0,1,1.0/splines.size(1)).numpy()
+	# open figure
+	plt.figure(figsize=(400/my_dpi, 400/my_dpi), dpi=my_dpi)
+	# plot splines
+	plt.plot(r,cur_spline[0,:].numpy(),color="r", linewidth=4)
+	plt.plot(r,cur_spline[1,:].numpy(),color="g", linewidth=4)
+	plt.plot(r,cur_spline[2,:].numpy(),color="b", linewidth=4)
+	# set range and show grid
+	plt.xlim(0,1)
+	plt.ylim(0,1)
+	plt.grid()
+	# save plot to PIL image
+	buf = io.BytesIO()
+	plt.savefig(buf, format='png', bbox_inches='tight', dpi=my_dpi)
+	plt.close()
+	buf.seek(0)
+	return Image.open(buf)
+
 
 def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dSaliency='', \
-		nclasses=150, outdir=''):
+		nclasses=150, outdir='', outdir_splines=''):
 		spline.eval()
 		# create folder
 		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
@@ -74,6 +94,11 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 						cur_img = (cur_img*255).astype(np.uint8)
 						cur_img = Image.fromarray(cur_img)
 						cur_img.save(os.path.join(outdir,experts_names[i],cur_fn))
+				# do splines if required
+				if outdir_splines:
+					for j in range(out[i].size(0)):
+						cur_fn = fns[j]
+						drawSpline(cur_spline, my_dpi=100).save(os.path.join(outdir_splines,experts_names[i],cur_fn))
 		# calculate differences
 		for i in range(len(de)):
 			de[i] /= nimages*h*w
@@ -113,7 +138,8 @@ if __name__ == '__main__':
 	parser.add_argument("-sal", "--saliency_dir", help="Folder containing semantic segmentation. \
 												If empty, model does not use semantic segmentation", default="")
 	# outdir
-	parser.add_argument("-od", "--out_dir", help="Output directory.", default="")
+	parser.add_argument("-od", "--out_dir",         help="Output directory.", default="")
+	parser.add_argument("-od", "--out_dir_splines", help="Output directory for splines.", default="")
 	# parse arguments
 	args = parser.parse_args()
 	# create output folder
@@ -131,7 +157,7 @@ if __name__ == '__main__':
 	# calculate
 	de, l1_l = test(args.input_dir, args.experts_dir, args.test_list, args.batchsize, \
 					spline, args.deltae, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, \
-					nclasses=args.nclasses, outdir=args.out_dir)
+					nclasses=args.nclasses, outdir=args.out_dir, outdir_splines=args.out_dir_splines)
 	# print results for each expert
 	for i in range(len(de)):
 		print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))
