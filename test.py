@@ -17,7 +17,7 @@ import ptcolor
 
 def drawSpline(cur_spline, my_dpi=100):
 	# define range
-	r = torch.arange(0,1,1.0/splines.size(1)).numpy()
+	r = torch.arange(0,1,1.0/cur_spline.size(1)).numpy()
 	# open figure
 	plt.figure(figsize=(400/my_dpi, 400/my_dpi), dpi=my_dpi)
 	# plot splines
@@ -41,12 +41,15 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 		spline.eval()
 		# create folder
 		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
+		if outdir_splines and not os.path.isdir(outdir_splines): os.makedirs(outdir_splines)
 		# get experts names and create corresponding folder
 		experts_names = []
 		for i in range(len(dExpert)):
 			experts_names.append([s for s in dExpert[i].split(os.sep) if s][-1])
 			if outdir and not os.path.isdir(os.path.join(outdir,experts_names[-1])):
 				os.makedirs(os.path.join(outdir,experts_names[-1]))
+			if outdir_splines and not os.path.isdir(os.path.join(outdir_splines,experts_names[-1])):
+				os.makedirs(os.path.join(outdir_splines,experts_names[-1]))
 		# create dataloader
 		test_data_loader = data.DataLoader(
 				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
@@ -98,7 +101,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				if outdir_splines:
 					for j in range(out[i].size(0)):
 						cur_fn = fns[j]
-						drawSpline(cur_spline, my_dpi=100).save(os.path.join(outdir_splines,experts_names[i],cur_fn))
+						drawSpline(splines[i][j,:,:], my_dpi=100).save(os.path.join(outdir_splines,experts_names[i],cur_fn))
 		# calculate differences
 		for i in range(len(de)):
 			de[i] /= nimages*h*w
@@ -139,7 +142,7 @@ if __name__ == '__main__':
 												If empty, model does not use semantic segmentation", default="")
 	# outdir
 	parser.add_argument("-od", "--out_dir",         help="Output directory.", default="")
-	parser.add_argument("-od", "--out_dir_splines", help="Output directory for splines.", default="")
+	parser.add_argument("-ods","--out_dir_splines", help="Output directory for splines.", default="")
 	# parse arguments
 	args = parser.parse_args()
 	# create output folder
