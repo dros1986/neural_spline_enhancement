@@ -69,7 +69,7 @@ def plotSplines(writer, splines, name, n_iter):
 
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, colorspace='srgb', apply_to='rgb', abs=False, \
-		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dSemSeg='', dSaliency='', nclasses=150, \
+		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dropout=0.0, dSemSeg='', dSaliency='', nclasses=150, \
 		  exp_name='', weights_from=''):
 		# define summary writer
 		expname = '{}_{}_np_{:d}_nf_{:d}_lr_{:.6f}_wd_{:.6f}_{}'.format(apply_to,colorspace,npoints,nc,lr,weight_decay,downsample_strategy)
@@ -105,7 +105,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		nch = 3
 		if os.path.isdir(dSemSeg): nch += nclasses
 		if os.path.isdir(dSaliency): nch += 1
-		spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,abs=abs,downsample_strategy=downsample_strategy,n_input_channels=nch).cuda()
+		spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,abs=abs, \
+					downsample_strategy=downsample_strategy,dropout=dropout,n_input_channels=nch).cuda()
 		# define optimizer
 		optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 		# ToDo: load weigths
@@ -233,6 +234,7 @@ if __name__ == '__main__':
 	parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
 	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
 	parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling.",     type=str, default='avgpool', choices=set(('maxpool','avgpool','convs','proj')))
+	parser.add_argument("-do", "--dropout",   help="Dropout.",                             type=float, default=0.0)
 	# hyper-params
 	parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
 	parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
@@ -260,4 +262,4 @@ if __name__ == '__main__':
 	train(args.input_dir, args.experts_dir, args.train_list, args.val_list, args.batchsize, \
 		args.nepochs, args.npoints, args.nfilters, colorspace=args.colorspace, apply_to=args.apply_to, abs=args.abs, \
 		downsample_strategy=args.downsample_strategy, deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, \
-		dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)
+		dropout=args.dropout, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)
