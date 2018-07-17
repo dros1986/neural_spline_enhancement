@@ -232,8 +232,9 @@ class NeuralSpline(nn.Module):
 			if self.abs:
 				out[nexp] = torch.abs(out[nexp])
 			# convert back if in test
-			if not self.training and self.apply_to=='lab':
-				out[nexp] = self.lab2rgb(out[nexp])
+			if not self.training:
+				if self.apply_to=='lab':
+					out[nexp] = self.lab2rgb(out[nexp])
 				out[nexp] = torch.clamp(out[nexp],0,1)
 		return out, splines
 
