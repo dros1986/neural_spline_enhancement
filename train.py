@@ -22,9 +22,9 @@ class cols:
 	GREEN = '\033[92m'; BLUE = '\033[94m'; CYAN = '\033[36m';
 	LIGHT_GRAY = '\033[37m'; ENDC = '\033[0m'
 
-def showImage(writer, batch, name, n_iter):
+def showImage(writer, batch, name, n_iter, padding=3, normalize=False):
 	# batch2image
-	img = utils.make_grid(batch[:,:3,:,:], nrow=int(math.sqrt(batch.size(0))), padding=3)
+	img = utils.make_grid(batch[:,:3,:,:], nrow=int(math.sqrt(batch.size(0))), padding=padding, normalize=normalize)
 	img = torch.clamp(img,0,1)
 	writer.add_image(name, img, n_iter)
 	# visualize first image maps if any
@@ -76,7 +76,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 		if os.path.isdir(dSemSeg): expname += '_sem'
 		if os.path.isdir(dSaliency): expname += '_sal'
 		if exp_name: expname += '_{}'.format(exp_name)
-		writer = SummaryWriter(os.path.join('./logs/', time.strftime('%Y-%m-%d %H:%M:%S'), expname))
+		writer = SummaryWriter(os.path.join('./logs/', expname))
 		# create models dir
 		if not os.path.isdir('./models/'): os.makedirs('./models/')
 		# define number of experts
@@ -164,6 +164,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update optimizer
 				if bn % (100 if curr_iter < 200 else 200) == 0:
 					showImage(writer, raw, 'train_input', curr_iter)
+					showImage(writer, spline.c1.weight[:,:3,:,:], 'c1_filters', curr_iter, padding=2, normalize=False)
+					showImage(writer, spline.c1.weight[:,:3,:,:], 'c1_filters_normalized', curr_iter, padding=2, normalize=True)
 					for i in range(len(experts)):
 						cur_out = out[i] if apply_to=='rgb' else spline.lab2rgb(out[i])
 						showImage(writer, cur_out.detach(), 'train_output_'+experts_names[i], curr_iter)
