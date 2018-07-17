@@ -14,6 +14,7 @@ from tqdm import tqdm
 from sklearn.preprocessing import OneHotEncoder
 import ptcolor
 import annotation
+import random
 
 
 def linear_sRGB(rgb):
@@ -35,6 +36,7 @@ class NeuralSplineBase(nn.Module):
 
     def rgb2lab(self,x, from_space='ignored'):
         return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction=1.8, space="prophoto", white_point="d50")
+        # return ptcolor.rgb2lab(x, clip_rgb=not self.training, gamma_correction="srgb", space="srgb", white_point="d65")
 
     def _precalc(self):
         """ Calculate interpolation mat for finding Ms.
@@ -182,12 +184,83 @@ class Baseline(NeuralSplineBase):
         # self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
         # self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
         # self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
+        self.l1 = nn.Linear(16*nc, 16*nc // 5)  # !!!
+        self.l2 = nn.Linear(16*nc // 5, 3*n*self.nexperts)
+
+    def forward(self, batch):
+        # get xs of the points with CNN
+        ys = batch
+        ys = F.relu(self.c1(ys))
+        ys = self.b2(F.relu(self.c2(ys)))
+        ys = self.b3(F.relu(self.c3(ys)))
+        ys = self.b4(F.relu(self.c4(ys)))
+        ys = self.b5(F.relu(self.c5(ys)))
+        # ys = self.b6(F.relu(self.c6(ys)))
+        # ys = self.b7(F.relu(self.c7(ys)))
+        ys = F.avg_pool2d(ys, ys.size(2))
+        ys = ys.view(ys.size(0),-1)
+        ys = F.dropout(ys, training=self.training)
+        ys = F.relu(self.l1(ys))
+        ys = F.dropout(ys, training=self.training)
+        ys = self.l2(ys)
+        ys = ys.view(ys.size(0),self.nexperts,3,-1)
+        return self._final_proc(batch, ys)
+
+
+class Simple(NeuralSplineBase):
+    def __init__(self, n, nc, nexperts):
+        super().__init__(n, nc, nexperts)
+        self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+        self.c2 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
+        self.c3 = nn.Conv2d(nc, nc, kernel_size=3, stride=2, padding=0)
+        self.l1 = nn.Linear(nc, nc)
+        self.l2 = nn.Linear(nc, 3 *n *self.nexperts)
+
+    def forward(self, batch):
+        # get xs of the points with CNN
+        ys = batch
+        ys = F.relu(self.c1(ys))
+        ys = F.relu(self.c2(ys))
+        ys = F.relu(self.c3(ys))
+        ys = F.adaptive_avg_pool2d(ys, 1).squeeze()
+        # ys = F.dropout(ys, training=self.training)
+        ys = F.relu(self.l1(ys))
+        # ys = F.dropout(ys, training=self.training)
+        ys = self.l2(ys)
+        ys = ys.view(ys.size(0),self.nexperts,3,-1)
+        return self._final_proc(batch, ys)
+
+
+class Crop(NeuralSplineBase):
+    def __init__(self, n, nc, nexperts):
+        super().__init__(n, nc, nexperts)
+        momentum = 0.01
+        # define net layers
+        self.c1 = nn.Conv2d(3, nc, kernel_size=3, stride=2, padding=0)
+        # self.b1 = nn.BatchNorm2d(nc, momentum=momentum)
+        self.c2 = nn.Conv2d(nc, 2*nc, kernel_size=3, stride=2, padding=0)
+        self.b2 = nn.BatchNorm2d(2*nc, momentum=momentum)
+        self.c3 = nn.Conv2d(2*nc, 4*nc, kernel_size=3, stride=2, padding=0)
+        self.b3 = nn.BatchNorm2d(4*nc, momentum=momentum)
+        self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
+        self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
+        self.c5 = nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0)
+        self.b5 = nn.BatchNorm2d(16*nc, momentum=momentum)
+        # self.c6 = nn.Conv2d(16*nc, 32*nc, kernel_size=3, stride=2, padding=0)
+        # self.b6 = nn.BatchNorm2d(32*nc, momentum=momentum)
+        # self.c7 = nn.Conv2d(32*nc, 64*nc, kernel_size=3, stride=2, padding=0)
+        # self.b7 = nn.BatchNorm2d(64*nc, momentum=momentum)
         self.l1 = nn.Linear(16*nc, 16*nc)
         self.l2 = nn.Linear(16*nc, 3*n*self.nexperts)
 
     def forward(self, batch):
         # get xs of the points with CNN
         ys = batch
+        if self.training:
+                crop = 128
+                i = random.randint(0, 256 - crop - 1)
+                j = random.randint(0, 256 - crop - 1)
+                ys = ys[:, :, i:i + crop, j:j + crop]
         ys = F.relu(self.c1(ys))
         ys = self.b2(F.relu(self.c2(ys)))
         ys = self.b3(F.relu(self.c3(ys)))
@@ -393,7 +466,7 @@ class Resnet50(NeuralSplineBase):
         d = xs.new_tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
         xs = (xs - m) / d
         return self.resnet(xs)
-                
+
     def forward(self, batch):
         #get xs of the points with CNN
         ys = batch
@@ -489,10 +562,10 @@ def unique(tensor1d):
 
 if __name__ == "__main__":
     n = 10
-    nf = 100
+    nf = 8
     # spline = NeuralSpline(n, nf, 1)
     # spline = HDRNet(n, nf, 1)
-    spline = ColorTransform(n, nf, 1)
+    spline = Simple(n, nf, 1)
     spline.cuda()
     print(spline)
     # img = torch.rand(1, 3, 256, 256)

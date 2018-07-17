@@ -104,15 +104,13 @@ def apply_gamma(rgb, gamma="srgb"):
         T = 0.0031308
         rgb1 = torch.max(rgb, rgb.new_tensor(T))
         return torch.where(rgb < T, 12.92 * rgb, (1.055 * torch.pow(torch.abs(rgb1), 1 / 2.4) - 0.055))
-    elif gamma is None or gamma == 1:
+    elif gamma is None:
         return rgb
     else:
-        T = 0.003
-        Tg = T ** ((1 / gamma) - 1)
-        rgb1 = torch.max(rgb, rgb.new_tensor(T))
-        return torch.where(rgb < T, Tg * rgb, torch.pow(torch.abs(rgb1), 1 / gamma))
+        return torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), 1.0 / gamma)
 
-    
+
+
 def remove_gamma(rgb, gamma="srgb"):
     """Gamma to linear rgb.
 
@@ -130,13 +128,12 @@ def remove_gamma(rgb, gamma="srgb"):
         T = 0.04045
         rgb1 = torch.max(rgb, rgb.new_tensor(T))
         return torch.where(rgb < T, rgb / 12.92, torch.pow(torch.abs(rgb1 + 0.055) / 1.055, 2.4))
-    elif gamma is None or gamma == 1:
+    elif gamma is None:
         return rgb
     else:
-        T = 0.003
-        Tg = T ** (gamma - 1)
-        rgb1 = torch.max(rgb, rgb.new_tensor(T))
-        return torch.where(rgb < T, Tg * rgb, torch.pow(torch.abs(rgb1), gamma))
+        res = torch.pow(torch.max(rgb, rgb.new_tensor(0.0)), gamma) + \
+              torch.min(rgb, rgb.new_tensor(0.0)) # very important to avoid vanishing gradients
+        return res
 
 
 def rgb2xyz(rgb, gamma_correction="srgb", clip_rgb=False, space="srgb"):

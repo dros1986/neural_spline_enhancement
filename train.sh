@@ -16,9 +16,10 @@ GT=/mnt/ssd/dataset/fivek/c
 python3 main.py \
 	-i $DB/raw \
 	-e $GT \
-	-bs 50 -np 10 -nf 8 \
+	-ne 160 \
+	-bs 16 -np 10 -nf 64 \
 	-tr $DB/train_mit.txt $DB/test_mit_random250.txt \
-	-en color_transform_srgb
+	-en simple64_prophoto
 
 
 # python3 main.py \
