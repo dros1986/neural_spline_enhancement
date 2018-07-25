@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils, models
 from Dataset import Dataset
-from NeuralSpline import NeuralSpline
+from NeuralSpline import NeuralSpline, Critic
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -98,9 +98,9 @@ def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA=10):
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, colorspace='srgb', apply_to='rgb', abs=False, \
 		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dropout=0.0, dSemSeg='', dSaliency='', nclasses=150, \
-		  critic_iters=10, lambdaa=10, exp_name='', weights_from=''):
+		  critic_iters=10, lambdaa=10, exp_name='', weights_from='', critic_type='custom'):
 	# define summary writer
-	expname = '{}_{}_np_{:d}_nf_{:d}_lr_{:.6f}_wd_{:.6f}_{}'.format(apply_to,colorspace,npoints,nc,lr,weight_decay,downsample_strategy)
+	expname = 'wgan-gp_{}_{}_np_{:d}_nf_{:d}_lr_{:.6f}_wd_{:.6f}_{}'.format(apply_to,colorspace,npoints,nc,lr,weight_decay,downsample_strategy)
 	if os.path.isdir(dSemSeg): expname += '_sem'
 	if os.path.isdir(dSaliency): expname += '_sal'
 	if exp_name: expname += '_{}'.format(exp_name)
@@ -138,13 +138,17 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 	spline = NeuralSpline(npoints,nc,nexperts,colorspace=colorspace,apply_to=apply_to,abs=abs, \
 				downsample_strategy=downsample_strategy,dropout=dropout,n_input_channels=nch).cuda()
 	# create critic
-	critic = models.resnet18(pretrained=False)
+	if critic_type == 'resnet18':
+		critic = models.resnet18(pretrained=False)
 
-	critic.conv1 = nn.Sequential(
-		nn.Upsample(size=(224,224),mode='bilinear'),
-		nn.Conv2d(2*3*len(dExpert), 64, kernel_size=7, stride=2, padding=3,bias=False)
-	)
-	critic.cuda()
+		critic.conv1 = nn.Sequential(
+			nn.Upsample(size=(224,224),mode='bilinear'),
+			nn.Conv2d(2*3*len(dExpert), 64, kernel_size=7, stride=2, padding=3,bias=False)
+		)
+		critic.cuda()
+	else:
+		critic = Critic(nc,nexperts,downsample_strategy=downsample_strategy,dropout=dropout)
+		critic.cuda()
 	# define optimizers
 	optimizer = torch.optim.Adam(spline.parameters(), lr=lr, weight_decay=weight_decay)
 	critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, weight_decay=weight_decay)
@@ -176,6 +180,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 			critic_optimizer.zero_grad()
 			# train with real
 			real_data = torch.cat([img.cuda() for img in datagen.next()],1)
+			real_data.requires_grad = True
 			D_real = critic(real_data)
 			D_real = D_real.mean()
 			D_real.backward(mone)
@@ -185,12 +190,13 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 			experts = images[1:]
 			with torch.no_grad(): fake, splines = spline(raw)
 			fake_data = torch.cat([raw]+fake,1)
+			fake_data.requires_grad = True
 			# fake_data = torch.cat(fake.expand(experts),0)
 			D_fake = critic(fake_data)
 			D_fake = D_fake.mean()
 			D_fake.backward(one)
 			# train with gradient penalty
-			gradient_penalty = calc_gradient_penalty(critic, real_data, fake_data, LAMBDA=lambdaa)
+			gradient_penalty = calc_gradient_penalty(critic, real_data.detach(), fake_data.detach(), LAMBDA=lambdaa)
 			gradient_penalty.backward()
 			# calculate overall loss
 			D_cost = D_fake - D_real + gradient_penalty
@@ -208,6 +214,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 		images = [img.cuda() for img in datagen.next()]
 		raw = images[0]
 		experts = images[1:]
+		raw.requires_grad = True
 		fake, splines = spline(raw)
 		fake_data = torch.cat([raw]+fake,1)
 		G = critic(fake_data)
@@ -257,7 +264,8 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 			).format(niter, niters, elapsed_time, D_cost.item(),Wasserstein_D.item(),G_cost.item())
 		print(s)
 		# every 1000 iters
-		if (niter+1) % 1000 == 0:
+		test_every = 100
+		if (niter+1) % test_every == 0:
 			# test values
 			de, l1_l = test(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, dSemSeg=dSemSeg, \
 															dSaliency=dSaliency, nclasses=150, outdir='')
@@ -268,7 +276,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, niters, npoints, nc, 
 				writer.add_scalar('L1-L_'+cur_exp_name, l1_l[i], niter)
 			# save best model
 			testid = 2 if len(experts_names)>=4 else 0
-			if niter == 999 or (niter>0 and de[testid]<best_de):
+			if (niter+1) == test_every or (niter+1>test_every and de[testid]<best_de):
 				best_de = de[testid]
 				torch.save({
 					'state_dict': spline.state_dict(),
