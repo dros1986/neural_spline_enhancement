@@ -5,8 +5,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
-from Dataset import Dataset
-from NeuralSpline import NeuralSpline
+from Dataset5 import Dataset
+from NeuralSpline5 import NeuralSpline
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib
@@ -32,7 +32,7 @@ def showImage(writer, batch, name, n_iter, padding=3, normalize=False):
 		img = batch[0,3:,:,:].unsqueeze(1)
 		img = utils.make_grid(img, nrow=int(math.sqrt(batch.size(0))), padding=3)
 		img = torch.clamp(img,0,1)
-	 	writer.add_image(name+'_maps', img, n_iter)
+		writer.add_image(name+'_maps', img, n_iter)
 
 def plotSplines(writer, splines, name, n_iter):
 	# get range
@@ -94,7 +94,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				])
 		# create dataloader
 		train_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, train_list, dSemSeg, dSaliency, nclasses=nclasses, trans=trans, include_filenames=False),
+				Dataset(dRaw, dExpert, train_list),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),
@@ -122,19 +122,20 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 			for bn, images in enumerate(train_data_loader):
 				spline.train()
 				raw = images[0]
-				experts = images[1:]
-				#print(bn)
+				experts = [images[1]]
+				who = images[2]
 				start_time = time.time()
 				# reset gradients
 				spline.zero_grad()
 				optimizer.zero_grad()
 				# send to GPU
 				raw = raw.cuda()
+				who = who.cuda()
 				for i in range(len(experts)): experts[i] = experts[i].cuda()
 				# force gradient saving
 				raw.requires_grad = True
 				# apply spline transform
-				out, splines = spline(raw)
+				out, splines = spline(raw, who)
 				# convert to lab
 				out_lab, gt_lab = [],[]
 				for i in range(len(experts)): gt_lab.append(spline.rgb2lab(experts[i]))

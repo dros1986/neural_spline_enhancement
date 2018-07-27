@@ -5,8 +5,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision import transforms, utils
-from Dataset import Dataset
-from NeuralSpline import NeuralSpline
+from Dataset5 import Dataset
+from NeuralSpline5 import NeuralSpline
 from tensorboardX import SummaryWriter
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
@@ -52,7 +52,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				os.makedirs(os.path.join(outdir_splines,experts_names[-1]))
 		# create dataloader
 		test_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
+				Dataset(dRaw, dExpert, test_list),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),
@@ -62,14 +62,16 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 		# create output mat
 		de,diff_l,nimages = [0 for i in range(len(dExpert))],[0 for i in range(len(dExpert))],0
 		# calculate differences
-		for bn, (images,fns) in enumerate(test_data_loader):
+		for bn, images in enumerate(test_data_loader):
 			raw = images[0]
-			experts = images[1:]
+			experts = [images[1]]
+			who = images[2]
 			nimages += experts[0].size(0)
 			# to GPU
 			raw = raw.cuda()
+			who = who.cuda()
 			# compute transform
-			out, splines = spline(raw)
+			out, splines = spline(raw, who)
 			# detach all
 			out = [e.detach() for e in out]
 			# get size of images

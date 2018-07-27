@@ -1,0 +1,5 @@
+TODO:
+- [X] inject experts
+- [ ] test only with expert C
+- [ ] horizontal flip?
+- [ ] squared loss?
