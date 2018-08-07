@@ -1,0 +1,8 @@
+# Obtained with the "abcde" model forcing, for instance the profile
+# [1, 0, 0, 0, 0] for expert A
+# For each expert A-E are reported DE76 DE94 DL on the test set
+10.9774 9.3236 7.2053
+8.7567 7.1344 4.9278
+10.5683 8.4148 5.6578
+10.7045 9.072 7.0249
+10.3882 8.3772 5.5715
