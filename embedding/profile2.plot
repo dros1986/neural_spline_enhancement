@@ -1,8 +1,3 @@
-# ARG1: title
-# ARG2: first data file
-# ARG3: second data file
-# ARG4: reference performance
-
 set size 0.5, 0.75
 set terminal pdf enhanced
 set termoption dash
@@ -10,6 +5,8 @@ set logscale x
 set xlabel "# images"
 set ylabel "{/Symbol D\}E_{76}"
 set title ARG1
+
+set key off
 
 set ytics 2
 # set yrange [8:14]
