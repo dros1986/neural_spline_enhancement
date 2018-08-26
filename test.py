@@ -52,7 +52,7 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				os.makedirs(os.path.join(outdir_splines,experts_names[-1]))
 		# create dataloader
 		test_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, test_list),
+				Dataset(dRaw, dExpert, test_list, ["expE"], False),
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),

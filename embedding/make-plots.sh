@@ -53,9 +53,10 @@ done
 #     done
 # done
 
-
-
 gnuplot embedding.plot
-
 pdfcrop embedding.pdf
 mv embedding-crop.pdf embedding.pdf
+
+gnuplot profile2-keys.plot
+pdfcrop profile-keys.pdf
+mv profile-keys-crop.pdf profile-keys.pdf

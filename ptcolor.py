@@ -280,7 +280,7 @@ def deltaE(lab1, lab2):
     75.0
 
     """
-    return torch.sqrt(squared_deltaE(lab1, lab2))
+    return torch.norm(lab1 - lab2, 2, 1, keepdim=True)
 
 
 def squared_deltaE94(lab1, lab2):

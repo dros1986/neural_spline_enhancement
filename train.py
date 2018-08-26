@@ -94,7 +94,7 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				])
 		# create dataloader
 		train_data_loader = data.DataLoader(
-				Dataset(dRaw, dExpert, train_list),
+				Dataset(dRaw, dExpert, train_list, "expA expB expC expD".split(), True),                        
 				batch_size = batch_size,
 				shuffle = True,
 				num_workers = cpu_count(),

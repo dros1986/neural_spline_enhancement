@@ -1,5 +1,23 @@
 TODO:
+- [X] test only with expert C  (baseline with flip de76 = 10.67)
+- [X] horizontal flip -> Improves by about 0.23
+- [X] crop -> No change (improves by about 0.08)
+- [X] squared loss -> Worsen by about 0.37
 - [X] inject experts
-- [ ] test only with expert C
-- [ ] horizontal flip?
-- [ ] squared loss?
+- [X] experts "leave one out"
+- [ ] linear experts
+- [ ] Retry semantic
+
+
+
+Results (DE76):
+
+|-------+----------------+-------|
+| c     |                | 10.67 |
+| c     | no horiz. flip | 10.90 |
+| c     | crop           | 10.59 |
+| c     | squared loss   | 11.04 |
+| abcde | direct         | 10.54 |
+| abcde | embedding      | 10.57 |
+|-------+----------------+-------|
+

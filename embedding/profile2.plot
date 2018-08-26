@@ -4,10 +4,11 @@ set termoption dash
 set logscale x
 set xlabel "# images"
 set ylabel "{/Symbol D\}E_{76}"
-set title ARG1
+set title ARG1 offset 7, -2.7
 
 set key off
 
+set xtics nomirror
 set ytics 2
 # set yrange [8:14]
 

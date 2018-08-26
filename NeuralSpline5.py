@@ -47,11 +47,7 @@ class NeuralSpline(nn.Module):
 		self.c4 = nn.Conv2d(4*nc, 8*nc, kernel_size=3, stride=2, padding=0)
 		self.b4 = nn.BatchNorm2d(8*nc, momentum=momentum)
 		# define "who" layers
-		self.wl =self.fc = nn.Sequential(
-				nn.Linear(5, 2),
-				nn.ReLU(True),
-				nn.Linear(2, 8*nc)
-			)
+		self.wl = nn.Linear(5, 2, bias=False)
 		# define downsample layers
 		if downsample_strategy=='maxpool':
 			self.downsample = nn.MaxPool2d(7, stride=1)
@@ -63,7 +59,7 @@ class NeuralSpline(nn.Module):
 		elif downsample_strategy=='avgpool':
 			self.downsample = nn.AvgPool2d(7, stride=1)
 			self.fc = nn.Sequential(
-				nn.Linear(8*nc, 8*nc),
+				nn.Linear(8*nc + 2, 8*nc),   # !!! + 2
 				nn.ReLU(True),
 				nn.Linear(8*nc, 3*n*self.nexperts)
 			)
@@ -198,8 +194,11 @@ class NeuralSpline(nn.Module):
 		ys = self.b3(F.relu(self.c3(ys)))
 		ys = self.b4(F.relu(self.c4(ys)))
 		ys = self.downsample(ys)
-		ys = ys.view(ys.size(0),-1) + self.wl(who)
+		ys = ys.view(ys.size(0),-1)
 		if self.dropout > 0.0 and self.training: ys = F.dropout(ys, p=self.dropout, training=self.training)
+		if who.size(1) == 5:
+		        who = self.wl(who)
+		ys = torch.cat([ys, who], 1)  # !!!
 		ys = self.fc(ys)
 		ys = ys.view(ys.size(0),self.nexperts,3,-1)
 		# now we got xs and ys. We need to create the interpolating spline
