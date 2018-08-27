@@ -9,16 +9,16 @@ Some examples:
 >>> rgb = torch.tensor([0.8, 0.4, 0.2]).view(1, 3, 1, 1)
 >>> lab = rgb2lab(rgb)
 >>> print(lab.view(-1))
-tensor([ 54.6400,  36.9148,  46.1227])
+tensor([54.6400, 36.9148, 46.1227])
 
 >>> rgb2 = lab2rgb(lab)
 >>> print(rgb2.view(-1))
-tensor([ 0.8000,  0.4000,  0.2000])
+tensor([0.8000,  0.4000,  0.2000])
 
 >>> rgb3 = torch.tensor([0.1333,0.0549,0.0392]).view(1, 3, 1, 1)
 >>> lab3 = rgb2lab(rgb3)
 >>> print(lab3.view(-1))
-tensor([ 6.1062,  9.3593,  5.2129])
+tensor([6.1062,  9.3593,  5.2129])
 
 """
 
@@ -37,15 +37,8 @@ def _t(data):
 
 # Helper for color matrix multiplication
 def _mul(coeffs, image):
-    # This is implementation is clearly suboptimal.  The function will
-    # be implemented with 'einsum' when a bug in pytorch 0.4.0 will be
-    # fixed (Einsum modifies variables in-place #7763).
-    coeffs = coeffs.to(image.device)
-    r0 = image[:, 0:1, :, :].repeat(1, 3, 1, 1) * coeffs[:, 0].view(1, 3, 1, 1)
-    r1 = image[:, 1:2, :, :].repeat(1, 3, 1, 1) * coeffs[:, 1].view(1, 3, 1, 1)
-    r2 = image[:, 2:3, :, :].repeat(1, 3, 1, 1) * coeffs[:, 2].view(1, 3, 1, 1)
-    return r0 + r1 + r2
-    # return torch.einsum("dc,bcij->bdij", (coeffs.to(image.device), image))
+    coeffs = coeffs.to(image.device).view(3, 3, 1, 1)
+    return torch.nn.functional.conv2d(image, coeffs)
 
 
 _RGB_TO_XYZ = {
@@ -97,7 +90,7 @@ def apply_gamma(rgb, gamma="srgb"):
     gamma can be "srgb", a real-valued exponent, or None.
 
     >>> apply_gamma(torch.tensor([0.5, 0.4, 0.1]).view([1, 3, 1, 1]), 0.5).view(-1)
-    tensor([ 0.2500, 0.1600, 0.0100])
+    tensor([0.2500, 0.1600, 0.0100])
 
     """
     if gamma == "srgb":
@@ -119,10 +112,10 @@ def remove_gamma(rgb, gamma="srgb"):
     gamma can be "srgb", a real-valued exponent, or None.
 
     >>> remove_gamma(apply_gamma(torch.tensor([0.001, 0.3, 0.4])))
-    tensor([ 0.0010,  0.3000,  0.4000])
+    tensor([0.0010,  0.3000,  0.4000])
 
     >>> remove_gamma(torch.tensor([0.5, 0.4, 0.1]).view([1, 3, 1, 1]), 2.0).view(-1)
-    tensor([ 0.2500, 0.1600, 0.0100])
+    tensor([0.2500, 0.1600, 0.0100])
     """
     if gamma == "srgb":
         T = 0.04045
@@ -143,22 +136,22 @@ def rgb2xyz(rgb, gamma_correction="srgb", clip_rgb=False, space="srgb"):
     return: Bx3xHxW
 
     >>> rgb2xyz(torch.tensor([0., 0., 0.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.,  0.,  0.])
+    tensor([0.,  0.,  0.])
 
     >>> rgb2xyz(torch.tensor([0., 0.75, 0.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.1868,  0.3737,  0.0623])
+    tensor([0.1868,  0.3737,  0.0623])
 
     >>> rgb2xyz(torch.tensor([0.4, 0.8, 0.2]).view(1, 3, 1, 1), gamma_correction=None).view(-1)
-    tensor([ 0.4871,  0.6716,  0.2931])
+    tensor([0.4871,  0.6716,  0.2931])
 
     >>> rgb2xyz(torch.ones(2, 3, 4, 5)).size()
     torch.Size([2, 3, 4, 5])
 
     >>> xyz2rgb(torch.tensor([-1, 2., 0.]).view(1, 3, 1, 1), clip_rgb=True).view(-1)
-    tensor([ 0.0000,  1.0000,  0.0000])
+    tensor([0.0000,  1.0000,  0.0000])
 
     >>> rgb2xyz(torch.tensor([0.4, 0.8, 0.2]).view(1, 3, 1, 1), gamma_correction=None, space='prophoto').view(-1)
-    tensor([ 0.4335,  0.6847,  0.1650])
+    tensor([0.4335,  0.6847,  0.1650])
 
     """
     if clip_rgb:
@@ -174,16 +167,16 @@ def xyz2rgb(xyz, gamma_correction="srgb", clip_rgb=False, space="srgb"):
     return: Bx3xHxW
 
     >>> xyz2rgb(torch.tensor([0., 0., 0.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.,  0.,  0.])
+    tensor([0.,  0.,  0.])
 
     >>> xyz2rgb(torch.tensor([0.04, 0.02, 0.05]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.3014,  0.0107,  0.2503])
+    tensor([0.3014,  0.0107,  0.2503])
 
     >>> xyz2rgb(torch.ones(2, 3, 4, 5)).size()
     torch.Size([2, 3, 4, 5])
 
     >>> xyz2rgb(torch.tensor([-1, 2., 0.]).view(1, 3, 1, 1), clip_rgb=True).view(-1)
-    tensor([ 0.0000,  1.0000,  0.0000])
+    tensor([0.0000,  1.0000,  0.0000])
 
     """
     rgb = _mul(_XYZ_TO_RGB[space], xyz)
@@ -205,13 +198,13 @@ def xyz2lab(xyz, white_point="d65"):
     return: Bx3xHxW
 
     >>> xyz2lab(torch.tensor([0., 0., 0.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.,  0.,  0.])
+    tensor([0.,  0.,  0.])
 
     >>> xyz2lab(torch.tensor([0.4, 0.2, 0.1]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 51.8372,  82.3018,  26.7245])
+    tensor([51.8372,  82.3018,  26.7245])
 
     >>> xyz2lab(torch.tensor([1., 1., 1.]).view(1, 3, 1, 1), white_point="e").view(-1)
-    tensor([ 100., 0., 0.])
+    tensor([100., 0., 0.])
 
     """
     xyz = xyz / WHITE_POINTS[white_point].to(xyz.device)
@@ -231,13 +224,13 @@ def lab2xyz(lab, white_point="d65"):
     return: Bx3xHxW
 
     >>> lab2xyz(torch.tensor([0., 0., 0.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.,  0.,  0.])
+    tensor([0.,  0.,  0.])
 
     >>> lab2xyz(torch.tensor([100., 0., 0.]).view(1, 3, 1, 1), white_point="e").view(-1)
-    tensor([ 1.,  1.,  1.])
+    tensor([1.,  1.,  1.])
 
     >>> lab2xyz(torch.tensor([50., 25., -30.]).view(1, 3, 1, 1)).view(-1)
-    tensor([ 0.2254,  0.1842,  0.4046])
+    tensor([0.2254,  0.1842,  0.4046])
 
     """
     f_xyz = _mul(_LAB_TO_XYZ, lab + _LAB_OFF.to(lab.device))
@@ -357,6 +350,26 @@ def _check_conversion(**opts):
                 if de > 2e-4:
                     print("Conversion failed for RGB:", r, g, b, " deltaE", de)
                     return False
+    return True
+
+
+def _check_gradients():
+    """Verify some borderline gradient computation
+
+    >>> a = torch.zeros(1, 3, 1, 1, requires_grad=True)
+    >>> b = torch.zeros(1, 3, 1, 1, requires_grad=True)
+    >>> deltaE(a, b).backward()
+    >>> torch.any(torch.isnan(a.grad)).item()
+    0
+    >>> torch.any(torch.isnan(b.grad)).item()
+    0
+
+    >>> deltaE94(a, b).backward()
+    >>> torch.any(torch.isnan(a.grad)).item()
+    0
+    >>> torch.any(torch.isnan(b.grad)).item()
+    0
+    """
     return True
 
 
