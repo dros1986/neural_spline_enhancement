@@ -1,8 +1,9 @@
 
 """Pytorch routines for color conversions and management.
 
-All color arguments are given as 4-dimensional tensors representing batch of images (Bx3xHxW).
-sRGB values are supposed in the range 0-1 (but values outside the range are tolerated).
+All color arguments are given as 4-dimensional tensors representing
+batch of images (Bx3xHxW).  RGB values are supposed to be in the
+range 0-1 (but values outside the range are tolerated).
 
 Some examples:
 
@@ -293,7 +294,9 @@ def squared_deltaE94(lab1, lab2):
     dc_2 = (c1 - c2) ** 2
     dab_2 = torch.sum(diff_2[:, 1:3, :, :], 1, keepdim=True)
     dh_2 = torch.abs(dab_2 - dc_2)
-    de_2 = dl_2 + dc_2 / ((1 + 0.045 * c1) ** 2) + dh_2 / ((1 + 0.015 * c1) ** 2)
+    de_2 = (dl_2 +
+            dc_2 / ((1 + 0.045 * c1) ** 2) +
+            dh_2 / ((1 + 0.015 * c1) ** 2))
     return de_2
 
 
@@ -327,7 +330,9 @@ def deltaE94(lab1, lab2):
     54.7575
 
     """
-    return torch.sqrt(squared_deltaE94(lab1, lab2))
+    # The ReLU prevents from NaNs in gradient computation
+    sq = torch.nn.functional.relu(squared_deltaE94(lab1, lab2))
+    return torch.sqrt(sq)
 
 
 def _check_conversion(**opts):

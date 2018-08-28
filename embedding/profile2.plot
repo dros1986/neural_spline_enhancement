@@ -9,6 +9,7 @@ set title ARG1 offset 7, -2.7
 set key off
 
 set xtics nomirror
+
 set ytics 2
 # set yrange [8:14]
 
