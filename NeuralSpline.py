@@ -49,18 +49,26 @@ class NeuralSpline(nn.Module):
 		# define downsample layers
 		if downsample_strategy=='maxpool':
 			self.downsample = nn.MaxPool2d(7, stride=1)
-			self.fc = nn.Sequential(
-				nn.Linear(8*nc, 8*nc),
-				nn.ReLU(True),
-				nn.Linear(8*nc, 3*n*self.nexperts)
-			)
+			self.fc = nn.ModuleList([])
+			for i in range(nexperts):
+				self.fc.append(
+					nn.Sequential(
+						nn.Linear(8*nc, 8*nc),
+						nn.ReLU(True),
+						nn.Linear(8*nc, 3*n)
+					)
+				)
 		elif downsample_strategy=='avgpool':
 			self.downsample = nn.AvgPool2d(7, stride=1)
-			self.fc = nn.Sequential(
-				nn.Linear(8*nc, 8*nc),
-				nn.ReLU(True),
-				nn.Linear(8*nc, 3*n*self.nexperts)
-			)
+			self.fc = nn.ModuleList([])
+			for i in range(nexperts):
+				self.fc.append(
+					nn.Sequential(
+						nn.Linear(8*nc, 8*nc),
+						nn.ReLU(True),
+						nn.Linear(8*nc, 3*n)
+					)
+				)
 		elif downsample_strategy=='convs':
 			self.downsample = nn.Sequential(
 				nn.Conv2d(8*nc, 16*nc, kernel_size=3, stride=2, padding=0),
@@ -70,11 +78,15 @@ class NeuralSpline(nn.Module):
 				nn.BatchNorm2d(32*nc, momentum=momentum),
 				nn.ReLU(True),
 			)
-			self.fc = nn.Sequential(
-				nn.Linear(32*nc, 16*nc),
-				nn.ReLU(True),
-				nn.Linear(16*nc, 3*n*self.nexperts)
-			)
+			self.fc = nn.ModuleList([])
+			for i in range(nexperts):
+				self.fc.append(
+					nn.Sequential(
+						nn.Linear(32*nc, 16*nc),
+						nn.ReLU(True),
+						nn.Linear(16*nc, 3*n)
+					)
+				)
 		else:
 			self.downsample = nn.Sequential(
 				nn.Conv2d(8*nc, 8*nc, kernel_size=1, stride=1, padding=0),
@@ -85,7 +97,8 @@ class NeuralSpline(nn.Module):
 				nn.ReLU(True),
 				nn.AvgPool2d(7, stride=1)
 			)
-			self.fc = lambda x: x
+			self.fc = nn.ModuleList([])
+			for i in range(nexperts): self.fc.append(lambda x: x)
 		# init weights
 		for m in self.modules():
 			if isinstance(m, nn.Conv2d):
@@ -194,8 +207,7 @@ class NeuralSpline(nn.Module):
 		ys = self.downsample(ys)
 		ys = ys.view(ys.size(0),-1)
 		if self.dropout > 0.0 and self.training: ys = F.dropout(ys, p=self.dropout, training=self.training)
-		ys = self.fc(ys)
-		ys = ys.view(ys.size(0),self.nexperts,3,-1)
+		ys = torch.cat([l(ys).view(-1,3,self.n).unsqueeze(1) for l in self.fc],1) # nexp*(bs,3*n) -> (bs,nexp,3,n)
 		# now we got xs and ys. We need to create the interpolating spline
 		# out = [torch.zeros(batch.size()).cuda() for i in range(self.nexperts)]
 		out = [torch.zeros(batch.size(0),3,batch.size(2),batch.size(3)).cuda() for i in range(self.nexperts)]
