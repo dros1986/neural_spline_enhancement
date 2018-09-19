@@ -70,15 +70,15 @@ def plotSplines(writer, splines, name, n_iter):
 
 def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, colorspace='srgb', apply_to='rgb', abs=False, \
 		  downsample_strategy='avgpool', deltae=96, lr=0.001, weight_decay=0.0, dropout=0.0, dSemSeg='', dSaliency='', nclasses=150, \
-		  exp_name='', weights_from=''):
+		  exp_name='', logs_dir='./logs/', models_dir='./models/', weights_from=''):
 		# define summary writer
 		expname = '{}_{}_np_{:d}_nf_{:d}_lr_{:.6f}_wd_{:.6f}_{}'.format(apply_to,colorspace,npoints,nc,lr,weight_decay,downsample_strategy)
 		if os.path.isdir(dSemSeg): expname += '_sem'
 		if os.path.isdir(dSaliency): expname += '_sal'
 		if exp_name: expname += '_{}'.format(exp_name)
-		writer = SummaryWriter(os.path.join('./logs/', expname))
+		writer = SummaryWriter(os.path.join(logs_dir, expname))
 		# create models dir
-		if not os.path.isdir('./models/'): os.makedirs('./models/')
+		if not os.path.isdir(models_dir): os.makedirs(models_dir)
 		# define number of experts
 		if isinstance(dExpert,str): dExpert = [dExpert]
 		nexperts = len(dExpert)
@@ -179,11 +179,12 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 							print('BOOOM! EXPLODED!!! NaNs in network weights. Problems in gamma correction?')
 							sys.exit(-1)
 				if bn % 100 == 0:
+					savepath = os.path.join(models_dir, expname + '.pth')
 					torch.save({
 						'state_dict': spline.state_dict(),
 						'optimizer': optimizer.state_dict(),
 						'nepoch' : nepoch,
-					}, './models/{}.pth'.format(expname))
+					}, savepath)
 				# get time
 				elapsed_time = time.time() - start_time
 				# define string
@@ -225,13 +226,18 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Neural Spline.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 	# data parameters
 	parser.add_argument("-i", "--input_dir", help="The input dir containing the raw images.",
-								   default="/media/flavio/Volume/datasets/fivek/raw/")
+								   default="/home/flavio/datasets/fivek_siggraph2018_mit/raw/")
 	parser.add_argument("-e", "--experts_dir", help="The experts dirs containing the gt. Can be more then one.",
-						nargs='+', default=["/media/flavio/Volume/datasets/fivek/ExpertC/"])
+						nargs='+', default=["/home/flavio/datasets/fivek_siggraph2018_mit/expC"])
 	parser.add_argument("-tl", "--train_list", help="Training list.",
-								   default="/media/flavio/Volume/datasets/fivek/train_mit.txt")
+								   default="/home/flavio/datasets/fivek_siggraph2018_mit/train1+2-list.txt")
 	parser.add_argument("-vl", "--val_list", help="Validation list.",
-								   default="/media/flavio/Volume/datasets/fivek/test_mit_random250.txt")
+								   default="/home/flavio/datasets/fivek_siggraph2018_mit/test-list.txt")
+	# output params
+	parser.add_argument("-ld", "--logs_dir", help="Folder where logs will be saved.",
+								   default='./logs/')
+	parser.add_argument("-md", "--models_dir", help="Folder where models will be saved.",
+								   default='./models/')
 	# spline params
 	parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
 	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
@@ -264,4 +270,5 @@ if __name__ == '__main__':
 	train(args.input_dir, args.experts_dir, args.train_list, args.val_list, args.batchsize, \
 		args.nepochs, args.npoints, args.nfilters, colorspace=args.colorspace, apply_to=args.apply_to, abs=args.abs, \
 		downsample_strategy=args.downsample_strategy, deltae=args.deltae, lr=args.lr, weight_decay=args.weight_decay, \
-		dropout=args.dropout, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname) #, weights_from=weights_from)
+		dropout=args.dropout, dSemSeg=args.semseg_dir, dSaliency=args.saliency_dir, nclasses=args.nclasses, exp_name=args.expname, \
+		logs_dir=args.logs_dir, models_dir=args.models_dir) #, weights_from=weights_from)
