@@ -81,9 +81,9 @@ def test(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dS
 				ot_lab = spline.rgb2lab(out[i].cuda())
 				# calculate deltaE
 				if deltae == 94:
-					cur_de = ptcolor.deltaE94(ot_lab, gt_lab)
+					cur_de = ptcolor.deltaE94(gt_lab, ot_lab)
 				else:
-					cur_de = ptcolor.deltaE(ot_lab, gt_lab)
+					cur_de = ptcolor.deltaE(gt_lab, ot_lab)
 				# add current deltaE to accumulator
 				de[i] += cur_de.sum()
 				# calculate L1 on L channel and add to

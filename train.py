@@ -146,9 +146,9 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				losses, loss = [], 0
 				for i in range(len(out_lab)):
 					if deltae == 94:
-						cur_loss = ptcolor.deltaE94(out_lab[i], gt_lab[i])
+						cur_loss = ptcolor.deltaE94(gt_lab[i], out_lab[i])
 					else:
-						cur_loss = ptcolor.deltaE(out_lab[i], gt_lab[i])
+						cur_loss = ptcolor.deltaE(gt_lab[i], out_lab[i])
 					cur_loss = cur_loss.mean()
 					losses.append(cur_loss)
 					writer.add_scalar('train_loss_{}'.format(experts_names[i]), cur_loss.data.cpu().mean(), curr_iter)
