@@ -1,13 +1,15 @@
 import torch
 import numpy as np
+import scipy.misc
 import sys
 sys.path.append("..")
 from Dataset5 import Dataset
 from NeuralSpline5 import NeuralSpline
 import ptcolor
+import os
 
 
-PROFILE = [0.0, 0.0, 0.0, 0.0, 1.0]
+PROFILE = [0.0, 0.0, 1.0, 0.0, 0.0]
 MODEL = "../models/rgb_srgb_np_10_nf_8_lr_0.000100_wd_0.100000_avgpool_abcde_emb_best.pth"
 TARGET_EXP = "expE"
 
@@ -15,6 +17,7 @@ TARGET_EXP = "expE"
 RAWDIR = "/mnt/data/dataset/fivek/siggraph2018/256x256/raw"
 EXPDIR = "/mnt/data/dataset/fivek/siggraph2018/256x256"
 TEST_LIST = "/mnt/data/dataset/fivek/siggraph2018/test-list.txt"
+OUTPUT_DIR = None  #"./out"
 
 
 def metrics(model, a, b):
@@ -37,23 +40,34 @@ def eval_profile(profile, model, raw_dir, expert_dir, file_list, expert, verbose
 	num_workers=torch.get_num_threads(),
 	drop_last=False)
 
+    with open(file_list) as f:
+        files = [x.strip() for x in f if x.strip()][::-1]
+
     device = next(model.parameters()).device
     who = torch.tensor(profile).to(device)
     nimages = 0
     tot_de76 = 0
     tot_de94 = 0
     tot_dl = 0
+    
     for images in loader:
         raw = images[0].to(device)
         expert = images[1].to(device)
         bs = expert.size(0)
         nimages += bs
         with torch.no_grad():
-            out = model(raw, who.repeat(bs, 1))[0][0]
-            de76, de94, dl = metrics(model, out, expert)
+            out = model(raw, who.repeat(bs, 1))[0][0].clamp(0, 1)
+            de76, de94, dl = metrics(model, expert, out)
             tot_de76 += torch.sum(de76).item()
             tot_de94 += torch.sum(de94).item()
             tot_dl += torch.sum(dl).item()
+        if OUTPUT_DIR is not None:
+            out_images = out.cpu().numpy()
+            out_images = out_images.transpose([0, 2, 3, 1]) * 255.0
+            out_images = out_images.astype(np.uint8)
+            for i in range(out_images.shape[0]):
+                fname = os.path.join(OUTPUT_DIR, files.pop())
+                scipy.misc.imsave(fname, out_images[i])
         if verbose:
             print(".", flush=True, end="")
     return (tot_de76 / nimages,  tot_de94 / nimages, tot_dl / nimages)

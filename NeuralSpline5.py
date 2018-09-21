@@ -172,7 +172,7 @@ class NeuralSpline(nn.Module):
 			cur_ch = image[ch,:,:].clone()
 			cur_ys = ys[ch,:].clone()
 			# calculate spline upon identity + found ys
-			identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
+			identity = torch.arange(0,cur_ys.size(0)).float()/(cur_ys.size(0)-1)
 			identity = identity.cuda()
 			cur_coeffs = self.interpolate(cur_ys+identity)
 			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1)).view(cur_ch.size())
