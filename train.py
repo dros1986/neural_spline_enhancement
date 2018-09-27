@@ -14,7 +14,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-from test import test
+from test_images import test_spline
 import customTransforms
 import ptcolor
 
@@ -200,25 +200,29 @@ def train(dRaw, dExpert, train_list, val_list, batch_size, epochs, npoints, nc, 
 				# update iter num
 				curr_iter = curr_iter + 1
 			# at the end of each epoch, test values
-			de, l1_l = test(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, dSemSeg=dSemSeg, \
-															dSaliency=dSaliency, nclasses=150, outdir='')
-			for i in range(len(de)):
-				cur_exp_name = experts_names[i]
-				writer.add_scalar('dE{:d}_'.format(deltae)+cur_exp_name, de[i], curr_iter)
-				writer.add_scalar('L1-L_'+cur_exp_name, l1_l[i], curr_iter)
+			names, acc = test_spline(dRaw, dExpert, val_list, batch_size, spline, deltae=deltae, dSemSeg=dSemSeg, \
+									dSaliency=dSaliency, nclasses=150, outdir='', outdir_splines='')
+			# save in tensorboard
+			for ne in range(len(acc)):
+				cur_exp_name = experts_names[ne]
+				for cur_name_id in range(len(names)):
+					writer.add_scalar('{}_{}'.format(names[cur_name_id],cur_exp_name), acc[ne][cur_name_id], curr_iter)
 			# save best model
 			testid = 2 if len(experts_names)>=4 else 0
-			if nepoch == 0 or (nepoch>0 and de[testid]<best_de):
-				best_de = de[testid]
+			target_de = acc[testid][0 if deltae==76 else 1]
+			if nepoch == 0 or (nepoch>0 and target_de<best_de):
+				best_de = target_de
+				savepath = os.path.join(models_dir, expname + '_best.pth')
 				torch.save({
 					'state_dict': spline.state_dict(),
 					'optimizer': optimizer.state_dict(),
 					'nepoch' : nepoch,
-					'dE{:d}'.format(deltae) : de[testid],
-				}, './models/{}_best.pth'.format(expname))
+					'dE{:d}'.format(deltae) : target_de,
+				}, savepath)
 			# print
-			print('{}CURR:{} dE{:d} = {}{:.4f}{} - L1_L = {}{:.4f}{}'.format(cols.BLUE,cols.LIGHT_GRAY, deltae, cols.GREEN, de[testid], cols.LIGHT_GRAY, cols.GREEN, l1_l[testid], cols.ENDC))
-			print('{}BEST:{} dE{:d} = {}{:.4f}{}'.format(cols.BLUE, cols.LIGHT_GRAY, deltae, cols.GREEN, best_de, cols.ENDC))
+			for ne in range(len(acc)):
+				print('{}: '.format(experts_names[ne]) + ' - '.join(['{}{} = {}{:.4f}{}'.format(cols.LIGHT_GRAY,cur_name,cols.GREEN,cur_val,cols.ENDC) for cur_name,cur_val in zip(names,acc[ne])]))
+			print('{}: {}BEST:{} dE{:d} = {}{:.4f}{}'.format(experts_names[testid], cols.BLUE, cols.LIGHT_GRAY, deltae, cols.GREEN, best_de, cols.ENDC))
 
 
 if __name__ == '__main__':
@@ -240,14 +244,14 @@ if __name__ == '__main__':
 								   default='./models/')
 	# spline params
 	parser.add_argument("-np", "--npoints",   help="Number of points of the spline.",      type=int, default=10)
-	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=32)
+	parser.add_argument("-nf", "--nfilters",  help="Number of filters.",                   type=int, default=8)
 	parser.add_argument("-ds", "--downsample_strategy",  help="Type of downsampling.",     type=str, default='avgpool', choices=set(('maxpool','avgpool','convs','proj')))
 	parser.add_argument("-do", "--dropout",   help="Dropout.",                             type=float, default=0.0)
 	# hyper-params
 	parser.add_argument("-bs", "--batchsize", help="Batchsize.",                           type=int, default=60)
 	parser.add_argument("-ne", "--nepochs",   help="Number of epochs. 0 avoids training.", type=int, default=2000)
 	parser.add_argument("-lr", "--lr",            help="Learning rate.",                   type=float, default=0.0001)
-	parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0)
+	parser.add_argument("-wd", "--weight_decay",  help="Weight decay.",                    type=float, default=0.1)
 	# colorspace management
 	parser.add_argument("-cs", "--colorspace",  help="Colorspace to which belong images.", type=str, default='srgb', choices=set(('srgb','prophoto')))
 	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))

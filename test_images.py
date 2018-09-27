@@ -41,7 +41,84 @@ def lab2rgb(x,colorspace):
 								space=colorspace)
 
 
-def test(dRes, dExpert, test_list, batch_size, deltae=94, colorspace='srgb', dSemSeg='', dSaliency='', \
+
+def test_spline(dRaw, dExpert, test_list, batch_size, spline, deltae=94, dSemSeg='', dSaliency='', \
+		nclasses=150, outdir='', outdir_splines=''):
+		spline.eval()
+		# create folder
+		if outdir and not os.path.isdir(outdir): os.makedirs(outdir)
+		if outdir_splines and not os.path.isdir(outdir_splines): os.makedirs(outdir_splines)
+		# get experts names and create corresponding folder
+		experts_names = []
+		for i in range(len(dExpert)):
+			experts_names.append([s for s in dExpert[i].split(os.sep) if s][-1])
+			if outdir and not os.path.isdir(os.path.join(outdir,experts_names[-1])):
+				os.makedirs(os.path.join(outdir,experts_names[-1]))
+			if outdir_splines and not os.path.isdir(os.path.join(outdir_splines,experts_names[-1])):
+				os.makedirs(os.path.join(outdir_splines,experts_names[-1]))
+		# create dataloader
+		test_data_loader = data.DataLoader(
+				Dataset(dRaw, dExpert, test_list, dSemSeg, dSaliency, nclasses=nclasses, include_filenames=True),
+				batch_size = batch_size,
+				shuffle = True,
+				num_workers = cpu_count(),
+				# num_workers = 0,
+				drop_last = False
+		)
+		# create function for calculating L1
+		def L1(gt_lab, ot_lab):
+			return torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:])
+		# create outputs
+		acc = [[0,0,0] for i in range(len(dExpert))]
+		fun = [ptcolor.deltaE, ptcolor.deltaE94, L1]
+		nme = ['dE76','dE94','L1']
+		# create output mat
+		de,diff_l,nimages = [0 for i in range(len(dExpert))],[0 for i in range(len(dExpert))],0
+		# calculate differences
+		for bn, (images,fns) in enumerate(test_data_loader):
+			raw = images[0]
+			experts = images[1:]
+			nimages += experts[0].size(0)
+			# to GPU
+			raw = raw.cuda()
+			# compute transform
+			out, splines = spline(raw)
+			# detach all
+			out = [e.detach() for e in out]
+			# get size of images
+			h,w = out[i].size(2),out[i].size(3)
+			# for each expert
+			for i in range(len(out)):
+				# convert gt and output in lab (remember that spline in test/lab converts back in rgb)
+				gt_lab = spline.rgb2lab(experts[i].cuda())
+				ot_lab = spline.rgb2lab(out[i].cuda())
+				# calculate metrics
+				for nn in range(len(nme)):
+					acc[i][nn] += fun[nn](gt_lab, ot_lab).sum()
+				# save if required
+				if outdir:
+					# save each image
+					for j in range(out[i].size(0)):
+						cur_fn = fns[j]
+						cur_img = out[i][j,:,:,:].cpu().numpy().transpose((1,2,0))
+						cur_img = (cur_img*255).astype(np.uint8)
+						cur_img = Image.fromarray(cur_img)
+						cur_img.save(os.path.join(outdir,experts_names[i],cur_fn))
+				# do splines if required
+				if outdir_splines:
+					for j in range(out[i].size(0)):
+						cur_fn = fns[j]
+						drawSpline(splines[i][j,:,:], my_dpi=100).save(os.path.join(outdir_splines,experts_names[i],cur_fn))
+		# normalize
+		for ne in range(len(out)):
+			for nm in range(len(nme)):
+				acc[ne][nm] /= nimages*h*w
+		# return
+		return nme, acc
+
+
+
+def test_images(dRes, dExpert, test_list, batch_size, colorspace='srgb', dSemSeg='', dSaliency='', \
 		nclasses=150, outdir=''):
 		# get expert name and create corresponding folder
 		expert_name = dExpert.split(os.sep)[-1]
@@ -54,8 +131,14 @@ def test(dRes, dExpert, test_list, batch_size, deltae=94, colorspace='srgb', dSe
 				# num_workers = 0,
 				drop_last = False
 		)
+		# create function for calculating L1
+		def L1(gt_lab, ot_lab):
+			return torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:])
 		# create outputs
-		de,diff_l,nimages = 0,0,0
+		acc = [0,0,0]
+		fun = [ptcolor.deltaE, ptcolor.deltaE94, L1]
+		nme = ['dE76','dE94','L1']
+		nimages = 0
 		# calculate differences
 		for bn, (images,fns) in enumerate(tqdm(test_data_loader)):
 			out = images[0]
@@ -69,20 +152,14 @@ def test(dRes, dExpert, test_list, batch_size, deltae=94, colorspace='srgb', dSe
 			# convert gt and output in lab
 			ot_lab = rgb2lab(out,colorspace=colorspace)
 			gt_lab = rgb2lab(expert,colorspace=colorspace)
-			# calculate deltaE
-			if deltae == 94:
-				cur_de = ptcolor.deltaE94(gt_lab, ot_lab)
-			else:
-				cur_de = ptcolor.deltaE(gt_lab, ot_lab)
-			# add current deltaE to accumulator
-			de += cur_de.sum()
-			# calculate L1 on L channel and add to
-			diff_l += torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:]).sum()
-		# calculate differences
-		de /= nimages*h*w
-		diff_l /= nimages*h*w
-		# return values
-		return de, diff_l
+			# calculate metrics
+			for i in range(len(nme)):
+				acc[i] += fun[i](gt_lab, ot_lab).sum()
+		# normalize
+		for i in range(len(nme)):
+			acc[i] /= nimages*h*w
+		# return
+		return nme, acc
 
 
 if __name__ == '__main__':
@@ -102,7 +179,7 @@ if __name__ == '__main__':
 	parser.add_argument("-at", "--apply_to",    help="Apply spline to rgb or lab images.", type=str, default='rgb', choices=set(('rgb','lab')))
 	parser.add_argument("-abs","--abs",  		help="Applies absolute value to out rgb.", action='store_true')
 	# evaluation metric
-	parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
+	# parser.add_argument("-de", "--deltae",  help="Version of the deltaE [76, 94].",        type=int, default=94, choices=set((76,94)))
 	# semantic segmentation params
 	parser.add_argument("-sem", "--semseg_dir", help="Folder containing semantic segmentation. \
 												If empty, model does not use semantic segmentation", default="")
@@ -115,10 +192,9 @@ if __name__ == '__main__':
 	# parse arguments
 	args = parser.parse_args()
 	# calculate
-	de, l1_l = test(args.input_dir, args.expert_dir, args.test_list, args.batchsize, \
-					args.deltae, colorspace=args.colorspace, dSemSeg=args.semseg_dir, \
+	nme,acc = test_images(args.input_dir, args.expert_dir, args.test_list, args.batchsize, \
+					colorspace=args.colorspace, dSemSeg=args.semseg_dir, \
 					dSaliency=args.saliency_dir, nclasses=args.nclasses, outdir=args.out_dir)
 	# print results
-	print('dE{:d} = {:.4f} - L1L = {:.4f}'.format(args.deltae,de,l1_l))
-	# for i in range(len(de)):
-	# 	print('{:d}: dE{:d} = {:.4f} - L1L = {:.4f}'.format(i,args.deltae,de[i],l1_l[i]))
+	txt = ' - '.join(['{} = {:.4f}'.format(cur_name,cur_val) for cur_name,cur_val in zip(nme,acc)])
+	print(txt)
