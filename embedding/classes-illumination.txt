@@ -1,0 +1,4 @@
+# class images dE76 dE94 dL
+artificial 149 12.77 9.50 5.23
+mixed 164 12.64 9.57 6.12
+"sun or sky" 687 9.79 7.55 5.44

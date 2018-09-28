@@ -2,7 +2,7 @@ set size 0.5, 0.75
 set terminal pdf enhanced
 set termoption dash
 set logscale x
-set xlabel "# images"
+set xlabel "Number of images"
 set ylabel "{/Symbol D\}E_{76}"
 set title ARG1 offset 7, -2.7
 

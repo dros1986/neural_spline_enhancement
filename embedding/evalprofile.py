@@ -44,7 +44,7 @@ def eval_profile(profile, model, raw_dir, expert_dir, file_list, expert, verbose
         files = [x.strip() for x in f if x.strip()][::-1]
 
     device = next(model.parameters()).device
-    who = torch.tensor(profile).to(device)
+    who = torch.tensor(profile).to(device).to(torch.float32)
     nimages = 0
     tot_de76 = 0
     tot_de94 = 0

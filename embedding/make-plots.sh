@@ -53,10 +53,21 @@ done
 #     done
 # done
 
-gnuplot embedding.plot
-pdfcrop embedding.pdf
-mv embedding-crop.pdf embedding.pdf
 
 gnuplot profile2-keys.plot
 pdfcrop profile-keys.pdf
 mv profile-keys-crop.pdf profile-keys.pdf
+
+for P in embedding spline-nodes times histogram-L histogram-a histogram-b histogram-keys classes ; do
+    gnuplot $P.plot
+    pdfcrop $P.pdf
+    mv $P-crop.pdf $P.pdf
+done
+
+# gnuplot embedding.plot
+# pdfcrop embedding.pdf
+# mv embedding-crop.pdf embedding.pdf
+
+# gnuplot profile2-keys.plot
+# pdfcrop profile-keys.pdf
+# mv profile-keys-crop.pdf profile-keys.pdf

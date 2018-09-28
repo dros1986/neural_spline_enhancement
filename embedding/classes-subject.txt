@@ -1,0 +1,7 @@
+# class images dE76 dE94 dL
+abstract 8 17.01 11.43 6.36
+animal(s) 67 9.96 7.84 5.87
+man-made 388 10.65 8.26 5.56
+nature 204 11.03 7.90 5.56
+person(s) 257 10.05 7.92 5.22
+unknown 76 12.31 9.28 5.83

@@ -1,0 +1,5 @@
+# class images dE76 dE94 dL
+"dawn or dusk" 44 12.48 9.23 6.11
+day 668 9.77 7.61 5.53
+night 22 13.09 9.30 4.27
+unknown 266 12.56 9.32 5.50

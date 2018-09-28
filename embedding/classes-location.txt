@@ -1,0 +1,4 @@
+# class images dE76 dE94 dL
+indoors 208 12.20 9.51 5.88
+outdoors 722 10.07 7.71 5.45
+unknown 70 12.72 8.99 5.16
