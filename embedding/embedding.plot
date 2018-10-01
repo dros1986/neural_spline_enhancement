@@ -1,4 +1,4 @@
-set size 3.0/5.0, 3.0/3.0
+set size 2.5/5.0, 2.5/3.0
 set terminal pdf
 set output "embedding.pdf"
 set size ratio -1
@@ -15,6 +15,4 @@ u22 = 0.6850168947081396
 
 plot c2 + (x - c1) * (u11 / u12) with lines lc rgb "gray" dt 2 lw 2 notitle, \
      c2 + (x - c1) * (u21 / u22) with lines lc rgb "gray" dt 2 lw 2 notitle, \
-     "embedding.txt" using 2:3:1 with labels point pt 7 offset 1.5 notitle
-     
-#     "embedding.txt" using 4:5:1 with labels point pt 7 offset 1 notitle
+     "embedding.txt" using 2:3:1 with labels point pt 7 lc rgb "#000080" offset 1.5 notitle
