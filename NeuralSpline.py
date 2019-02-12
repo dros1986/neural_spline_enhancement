@@ -184,7 +184,7 @@ class NeuralSpline(nn.Module):
 			cur_ys = ys[ch,:].clone()
 			# calculate spline upon identity + found ys
 			identity = torch.arange(0,cur_ys.size(0))/(cur_ys.size(0)-1)
-			identity = identity.cuda()
+			identity = identity.cuda().float()
 			cur_coeffs = self.interpolate(cur_ys+identity)
 			image[ch,:,:] = self.apply(cur_coeffs, cur_ch.view(-1)).view(cur_ch.size())
 			splines[ch,:] = self.apply(cur_coeffs,self.xs).data.cpu()
@@ -196,7 +196,7 @@ class NeuralSpline(nn.Module):
 		if self.apply_to=='lab': batch = self.rgb2lab(batch)
 		# resize if needed
 		if not (batch.size(2) == 256 and batch.size(3) == 256):
-			smallbatch = F.upsample(batch, size=(256,256),mode='bilinear')
+			smallbatch = F.interpolate(batch, size=(256,256),mode='bilinear')
 		else:
 			smallbatch = batch
 		# get xs of the points with CNN
