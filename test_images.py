@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 import ptcolor
 from tqdm import tqdm
+import pandas as pd
 
 
 def rgb2lab(x, colorspace):
@@ -133,12 +134,13 @@ def test_images(dRes, dExpert, test_list, batch_size, colorspace='srgb', dSemSeg
 		)
 		# create function for calculating L1
 		def L1(gt_lab, ot_lab):
-			return torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:])
+			return torch.abs(ot_lab[:,0,:,:]-gt_lab[:,0,:,:]).unsqueeze(1)
 		# create outputs
 		acc = [0,0,0]
 		fun = [ptcolor.deltaE, ptcolor.deltaE94, L1]
 		nme = ['dE76','dE94','L1']
 		nimages = 0
+		df = pd.DataFrame(columns=nme)
 		# calculate differences
 		for bn, (images,fns) in enumerate(tqdm(test_data_loader)):
 			out = images[0]
@@ -154,7 +156,14 @@ def test_images(dRes, dExpert, test_list, batch_size, colorspace='srgb', dSemSeg
 			gt_lab = rgb2lab(expert,colorspace=colorspace)
 			# calculate metrics
 			for i in range(len(nme)):
-				acc[i] += fun[i](gt_lab, ot_lab).sum()
+				cur_metric_map = fun[i](gt_lab, ot_lab)
+				acc[i] += cur_metric_map.sum()
+				# add to single image metrics
+				for im_num, im_fn in enumerate(fns):
+					if i==0: df.loc[im_fn]=0
+					df.loc[im_fn][nme[i]] = round(cur_metric_map[im_num,:,:,:].mean().item(),2)
+		df.to_csv(os.path.join(outdir,'single_images_results.csv'))
+				# acc[i] += fun[i](gt_lab, ot_lab).sum()
 		# normalize
 		for i in range(len(nme)):
 			acc[i] /= nimages*h*w
