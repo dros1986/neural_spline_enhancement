@@ -7,10 +7,11 @@ set ylabel "Votes (%)"
 
 set key top left
 
-set xtics nomirror rotate 90 offset (0, 0.5)
+set xtics nomirror rotate by 30 right # offset (0, 0.5)
+set ytics nomirror 10
 # set ytics 7,2,17
 # set xrange [-1.5:21]
-# set yrange [9:18]
+set yrange [0:42]
 set style fill solid
 set boxwidth 0.25
 

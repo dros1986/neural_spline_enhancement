@@ -1,8 +1,9 @@
 set size 0.62, 0.6
 set terminal pdf enhanced
 set output "histogram-b.pdf"
-set xlabel "b"
+# set xlabel "b"
 set ylabel "P(b)"
+set title "b"
 
 set key outside right
 
