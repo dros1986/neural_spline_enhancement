@@ -1,0 +1,8 @@
+# Total : 707 votes
+Dist.Recover 20
+CycleGAN 25
+Exposure 39
+Unfiltering 97
+Pix2pix 115
+HDRNet 189
+SpliNet 222

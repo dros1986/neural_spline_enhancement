@@ -6,6 +6,7 @@ import torch.utils.data as data
 
 
 ENCODING = dict((x, n) for (n, x) in enumerate("expA expB expC expD expE".split()))
+ENCODING.update(dict((x, 2) for x in "user-F user-G user-H user-I user-J".split()))
 ENCODING[""] = -1
 
 
