@@ -8,6 +8,8 @@ for e in f g h i j; do
     DATA2="fit-profile-results-$e.txt"
     SUMMARY1="vote-profile-summary-$e.txt"
     SUMMARY2="fit-profile-summary-$e.txt"
+    CISAME="ci_exp${e^^}-CollabFilt_sameExpert.csv"
+    CIMULTI="ci_exp${e^^}-CollabFilt_multiExpert.csv"
     PDF="profile-$e.pdf"
     CROP=${PDF%.pdf}-crop.pdf
 
@@ -20,7 +22,7 @@ for e in f g h i j; do
     grep AVG -A2 $DATA2 | tr $'\n' ' ' | sed "s/--/\n/g" > $SUMMARY2
 
     # Make the plot
-    gnuplot -c profile2.plot "User ${e^^}" $SUMMARY1 $SUMMARY2 $REF > $PDF
+    gnuplot -c profile2.plot "User ${e^^}" $SUMMARY1 $SUMMARY2 $CISAME $CIMULTI > $PDF
 
     # Crop the result
     pdfcrop $PDF

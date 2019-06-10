@@ -22,7 +22,7 @@ set label "Location" at 13, 16 center font ", 9"
 set label "Daytime" at 18, 16 center font ", 9"
 
 
-plot "classes-subject.txt" using 0:3:xtic(1) with boxes fc rgb "#000080", \
-     "classes-illumination.txt" using (7.5 + $0):3:xtic(1) with boxes fc rgb "#F07000", \
-     "classes-location.txt" using (12 + $0):3:xtic(1) with boxes fc rgb "#000080", \
-     "classes-time.txt" using (16.5 + $0):3:xtic(1) with boxes fc rgb "#F07000"
+plot "classes-subject.txt" using 0:3:xtic(sprintf('%s (%d)', stringcolumn(1), $2)) with boxes fc rgb "#000080", \
+     "classes-illumination.txt" using (7.5 + $0):3:xtic(sprintf('%s (%d)', stringcolumn(1), $2)) with boxes fc rgb "#F07000", \
+     "classes-location.txt" using (12 + $0):3:xtic(sprintf('%s (%d)', stringcolumn(1), $2)) with boxes fc rgb "#000080", \
+     "classes-time.txt" using (16.5 + $0):3:xtic(sprintf('%s (%d)', stringcolumn(1), $2)) with boxes fc rgb "#F07000"

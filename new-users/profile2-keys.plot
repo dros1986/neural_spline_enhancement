@@ -17,4 +17,5 @@ set noylabel
 
 plot 20 with linespoints title "Voting" lc rgb "#000080" lw 2 pt 7 ps 0.6, \
      21 with linespoints title "Fitting" lc rgb "#F07000" lw 2 pt 13 ps 0.6, \
-     22 with lines title "Average profile" lc rgb "black" dt 2 lw 2
+     22 with lines title "Collab.Filt (best expert)" lc rgb "black" dt 2 lw 2, \
+     22 with lines title "Collab.Filt (all experts)" lc rgb "red" dt 2 lw 2
