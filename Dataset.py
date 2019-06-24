@@ -30,10 +30,13 @@ class Dataset(data.Dataset):
 		raw = np.array(Image.open(os.path.join(self.dRaw,fn)).convert('RGB'))
 		raw = raw.astype(np.float32) / 255.
 		images =[raw]
-		for cur_dexp in self.dExpert:
-			cur_img = np.array(Image.open(os.path.join(cur_dexp,fn)).convert('RGB'))
-			cur_img = cur_img.astype(np.float32) / 255.
-			images.append(cur_img)
+		# check if there are experts to load
+		if self.dExpert is not None:
+			# if there are, load their images
+			for cur_dexp in self.dExpert:
+				cur_img = np.array(Image.open(os.path.join(cur_dexp,fn)).convert('RGB'))
+				cur_img = cur_img.astype(np.float32) / 255.
+				images.append(cur_img)
 		# open semantic segmentation
 		semseg = []
 		if os.path.isdir(self.dSemSeg):
