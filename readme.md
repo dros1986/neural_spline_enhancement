@@ -1,9 +1,9 @@
-## Evaluation
+## Inference
 
 It is possible to replicate the results of the paper with the following command:
 
 ``` bash
-clear && python regen.py \
+python regen.py \
 --input_dir <DATASET_DIR>/raw \
 --test_list <DATASET_DIR>/test-list.txt \
 --out_dir ./regen \
