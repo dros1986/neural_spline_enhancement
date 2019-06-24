@@ -1,3 +1,7 @@
+Implementation of the paper: <NONE>
+
+![Pipeline](https://github.com/dros1986/neural_spline_enhancement/blob/master/res/pipe1.png?raw=true)
+
 ## Inference
 
 It is possible to replicate the results of the paper with the following command:
