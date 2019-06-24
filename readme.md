@@ -2,7 +2,7 @@
 
 It is possible to replicate the results of the paper with the following command:
 
-``` python
+``` bash
 clear && python regen.py \
 --input_dir <DATASET_DIR>/raw \
 --test_list <DATASET_DIR>/test-list.txt \
