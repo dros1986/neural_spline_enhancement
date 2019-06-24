@@ -1,11 +1,12 @@
-set size 0.62, 0.6
+set size 0.4, 0.6
 set terminal pdf enhanced
 set output "histogram-b.pdf"
 # set xlabel "b"
 set ylabel "P(b)"
 set title "b"
 
-set key outside right
+# set key outside right
+set key off
 
 set xtics -120, 60, 120 nomirror
 set format y "10^{%L}"

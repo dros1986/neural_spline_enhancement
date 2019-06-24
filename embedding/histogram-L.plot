@@ -5,7 +5,7 @@ set output "histogram-L.pdf"
 set ylabel "P(L)"
 set title "L"
 
-set key off
+set key bottom left
 
 # set xtics 5
 set xtics nomirror
@@ -17,5 +17,5 @@ set logscale y
 
 DATAFILE = "histogram-L.txt"
 
-plot DATAFILE using 1:2 with lines notitle  lc rgb "#000080" lw 2, \
-     DATAFILE using 1:3 with lines notitle  lc rgb "#F07000" lw 2
+plot DATAFILE using 1:2 with lines title "Expert C"  lc rgb "#000080" lw 2, \
+     DATAFILE using 1:3 with lines title "Output" lc rgb "#F07000" lw 2
