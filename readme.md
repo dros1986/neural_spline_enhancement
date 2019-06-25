@@ -12,7 +12,7 @@ python regen.py \
 --test_list <DATASET_DIR>/test-list.txt \
 --out_dir ./regen \
 --out_dir_splines ./regen_splines \
---model ./models/expertC.pth \
+--model ./models/expC.pth \
 --batchsize 10 \
 --npoints 10 \
 --nfilters 8 \
