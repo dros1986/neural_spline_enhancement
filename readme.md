@@ -2,7 +2,7 @@ Implementation of the paper:
 
 **Personalized Image Enhancement using Neural Spline Color Transform**<br>
 Transactions on Graphics, ACM<br>
-[F. Piccoli](http://www.ivl.disco.unimib.it/people/flavio-piccoli/ "Flavio Piccoli"), [C. Cusano](http://www.ivl.disco.unimib.it/people/claudio-cusano/ "Claudio Cusano"), [S. Bianco](http://www.ivl.disco.unimib.it/people/simone-bianco/ "Simone Bianco"), [R. Schettini](http://www.ivl.disco.unimib.it/people/raimondo-schettini/ "Raimondo Schettini")
+[S. Bianco](http://www.ivl.disco.unimib.it/people/simone-bianco/ "Simone Bianco"), [C. Cusano](http://www.ivl.disco.unimib.it/people/claudio-cusano/ "Claudio Cusano"), [F. Piccoli](http://www.ivl.disco.unimib.it/people/flavio-piccoli/ "Flavio Piccoli"), [R. Schettini](http://www.ivl.disco.unimib.it/people/raimondo-schettini/ "Raimondo Schettini")
 
 ![Pipeline](https://github.com/dros1986/neural_spline_enhancement/blob/master/res/pipe1.png?raw=true)
 
