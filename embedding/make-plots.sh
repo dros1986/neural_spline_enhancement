@@ -64,6 +64,24 @@ for P in embedding spline-nodes times histogram-L histogram-a histogram-b histog
     mv $P-crop.pdf $P.pdf
 done
 
+
+for e in a b c d e; do
+    DATA1="multi-$e-classes-subject.txt"
+    DATA2="multi-$e-classes-illumination.txt"
+    DATA3="multi-$e-classes-location.txt"
+    DATA4="multi-$e-classes-time.txt"
+    PDF="multi-$e-classes.pdf"
+    CROP=${PDF%.pdf}-crop.pdf
+
+    # Make the plot
+    gnuplot -c multi-classes.plot "Expert ${e^^}" $DATA1 $DATA2 $DATA3 $DATA4 > $PDF
+
+    # Crop the result
+    pdfcrop $PDF
+    mv $CROP $PDF
+done
+
+
 # gnuplot embedding.plot
 # pdfcrop embedding.pdf
 # mv embedding-crop.pdf embedding.pdf

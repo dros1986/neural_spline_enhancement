@@ -76,6 +76,7 @@ def eval_profile(profile, model, raw_dir, expert_dir, file_list, expert, verbose
 def main():
     model = NeuralSpline(10, 8, 1)
     model_file = MODEL
+    test_list = TEST_LIST
     if len(sys.argv) > 1:
         model_file = sys.argv[1]
     target_expert = "c"
@@ -84,13 +85,15 @@ def main():
     profile = PROFILE
     if len(sys.argv) > 3:
         profile = list(map(float, sys.argv[3:8]))
+    if len(sys.argv) > 8:
+        test_list = sys.argv[8]
         
     data = torch.load(model_file)
     model.load_state_dict(data["state_dict"])
     model.cuda()
     model.eval()
 
-    de76, de94, dl = eval_profile(profile, model, RAWDIR, EXPDIR, TEST_LIST, target_expert, verbose=True)
+    de76, de94, dl = eval_profile(profile, model, RAWDIR, EXPDIR, test_list, target_expert, verbose=True)
     print()
     print("DE76", de76)
     print("DE94", de94)
