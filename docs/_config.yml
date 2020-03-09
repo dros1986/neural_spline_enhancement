@@ -1,1 +1,5 @@
 theme: jekyll-theme-cayman
+title: Personalized Image Enhancement Using NeuralSpline Color Transforms
+description: A new method for fast adaptation of image enhancement to a new user style.
+show_downloads: "true"
+google_analytics: UA-159944018-1
