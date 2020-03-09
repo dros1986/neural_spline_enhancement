@@ -11,3 +11,23 @@ The transformation applied to the input image is found by a convolutional neural
 image and produces as output one set of control points for each of the three color channels. Then, the control points are interpolated with natural cubic splines and the resulting functions are globally applied to the values of the input pixels to produce the output image.
 Experimental results compare favorably against recent methods in the state of the art on the MIT-Adobe FiveK dataset.
 Furthermore, we also propose an extension of the SpliNet in which a single neural network is used to model the style of multiple reference retouchers by embedding them into a user space.  The style of new users can be reproduced without retraining the network, after a quick modeling stage in which they are positioned in the user space on the basis of their preferences on a very small set of retouched images.
+
+## Paper
+
+Please include the following reference in your paper if you mention the method (the paper is not available yet):
+
+```
+@inproceedings{personalizedimageenhancement2020,
+  author = {Bianco, Simone and Cusano, Claudio and Piccoli, Flavio and Schettini, Raimondo},
+  title = {Personalized Image Enhancement using Neural Spline Color Transform},
+  booktitle = {IEEE Transactions on Image Processing},
+  pages = {0--0},
+  year = {2020}
+}
+```
+
+## Overview
+
+![pipeline single user](https://raw.githubusercontent.com/dros1986/neural_spline_enhancement/master/docs/pipe_single.png)
+
+![pipeline adaptation](https://raw.githubusercontent.com/dros1986/neural_spline_enhancement/master/docs/pipe_multi.png)
