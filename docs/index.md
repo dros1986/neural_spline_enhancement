@@ -28,6 +28,10 @@ Please include the following reference in your paper if you mention the method (
 
 ## Overview
 
+Given a RAW image, the method estimates the enhancement performed by the user. Two approaches are proposed. The first one learns to mimic the enhancement of the user through a new training of the system:
+
 ![pipeline single user](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_single.png)
+
+The second approach is an extension of the first and allows to learn the user style just with few enhanced images and does not require training. An optimization mechanism assigns a signature to the new user that encodes its style and use it to adapt the pretrained system:
 
 ![pipeline adaptation](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_multi.png)
