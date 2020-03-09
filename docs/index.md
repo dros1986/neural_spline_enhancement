@@ -28,6 +28,6 @@ Please include the following reference in your paper if you mention the method (
 
 ## Overview
 
-![pipeline single user](https://raw.githubusercontent.com/dros1986/neural_spline_enhancement/master/docs/pipe_single.png)
+![pipeline single user](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_single.png)
 
-![pipeline adaptation](https://raw.githubusercontent.com/dros1986/neural_spline_enhancement/master/docs/pipe_multi.png)
+![pipeline adaptation](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_multi.png)
