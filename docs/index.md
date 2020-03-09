@@ -32,6 +32,42 @@ Given a RAW image, the method estimates the enhancement performed by the user. T
 
 ![pipeline single user](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_single.png)
 
+
 The second approach is an extension of the first and allows to learn the user style just with few enhanced images and does not require training. An optimization mechanism assigns a signature to the new user that encodes its style and use it to adapt the pretrained system:
 
 ![pipeline adaptation](https://github.com/dros1986/neural_spline_enhancement/raw/master/docs/pipe_multi.png)
+
+
+## Installing and running the software
+
+The method is implemented in the python programming language and uses the pytorch framework for deep learning.
+It has been tested on a workstation equiped with a single NVIDIA Titan-Xp GPU and with the Ubuntu 16.04 operating system,
+python version 3.7.4, CUDA 10.1, CUDNN 7.0.5.
+
+To install the software the following steps are suggested (others may work as well).
+
+from a terminal:
+```
+git clone https://github.com/dros1986/neural_spline_enhancement.git
+```
+
+### Processing the images
+
+The pretrained models of each expert of the FiveK dataset are already in the repository in the folder _models_.
+
+The paths to the images to process must be placed in a text file (one path per line). Paths should start after the path specified in _input\_dir_. Images can be enhanced with the following command:
+
+``` bash
+python regen.py \
+--input_dir <DATASET_DIR>/raw \
+--test_list <DATASET_DIR>/test-list.txt \
+--out_dir ./regen \
+--out_dir_splines ./regen_splines \
+--model ./models/expC.pth \
+--batchsize 10 \
+--npoints 10 \
+--nfilters 8 \
+--nexperts 1
+```
+
+Sobstitute <DATASET_DIR> with the directory of the dataset. If you want to test different experts, just change the model with _exp<LETTER>.pth_ of the corresponding expert where _<LETTER>_ can be _A,B,C,D,E_.
