@@ -71,3 +71,23 @@ python regen.py \
 ```
 
 Sobstitute <DATASET_DIR> with the directory of the dataset. If you want to test different experts, just change the model with _exp<LETTER>.pth_ of the corresponding expert where _<LETTER>_ can be _A,B,C,D,E_.
+
+
+### Training a new model
+
+Similarly to the testing procedure, training a new model requires
+that the paths to the images are listed in a text file to form a training set.
+
+The command to give is then:
+``` bash
+python train.py \
+--input_dir <DATASET_DIR>/raw/ \
+--experts_dir <DATASET_DIR>/expC \
+--train_list <DATASET_DIR>/train-list.txt \
+--val_list <DATASET_DIR>/test-list.txt \
+--batchsize 10 \
+--npoints 10 \
+--nfilters 8 \
+--nexperts 1
+```
+where `train-list.txt` is the file listing the training images and `input_dir` and `experts_dir` are respectively the folders containing the raw and the expert-enhanced images. The training script supports many options (type `python train.py -h` to list them).  Default values are those used in the paper.
