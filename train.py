@@ -32,7 +32,7 @@ def showImage(writer, batch, name, n_iter, padding=3, normalize=False):
 		img = batch[0,3:,:,:].unsqueeze(1)
 		img = utils.make_grid(img, nrow=int(math.sqrt(batch.size(0))), padding=3)
 		img = torch.clamp(img,0,1)
-	 	writer.add_image(name+'_maps', img, n_iter)
+		writer.add_image(name+'_maps', img, n_iter)
 
 def plotSplines(writer, splines, name, n_iter):
 	# get range
